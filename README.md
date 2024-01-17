@@ -11,7 +11,7 @@ The app is available as a Docker image from
 server, you need to have [Docker](https://www.docker.com/) installed.
 
 ```console
-docker run -p 5000:5000 biocypher/biochatter-server
+docker run -p 5000:5000 -d biocypher/biochatter-server
 ```
 
 ## Local Build
@@ -20,7 +20,7 @@ You can also run the following code to build and start the server locally:
 
 ```console
 docker build -t biochatter-server .
-docker run -p 5000:5000 biochatter-server
+docker run -p 5000:5000 -d biochatter-server
 ```
 
 ## API docs
