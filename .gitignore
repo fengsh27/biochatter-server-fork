@@ -1,0 +1,5 @@
+# python ignore files
+__pycache__/
+*.py[cod]
+*$py.class
+logs/
