@@ -29,8 +29,11 @@ Coming soon.
 
 ## Developer
 
-We build the Docker image using the following command to account for ARM and AMD64 architectures:
+We build the Docker image using the following command to account for ARM and
+AMD64 architectures:
 
 ```console
 docker buildx build --tag biocypher/biochatter-server:latest --tag biocypher/biochatter-server:<version> --platform linux/amd64,linux/arm64 --push .
 ```
+
+The version on Dockerhub should match the version in the `pyproject.toml` file.
