@@ -2,11 +2,12 @@
 __pycache__/
 *.py[cod]
 *$py.class
-logs/
+logs/app.log
 
 # env file
 .env
 
 # code
 .vscode/
+.git/
 
