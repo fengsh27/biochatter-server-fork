@@ -63,7 +63,7 @@ class SessionData:
                 if not authKey:
                     return False
                 self.chatter.set_api_key(api_key, self.sessionId)
-        (is_azure, azure_deployment, base_url) = get_azure_embedding_deployment()
+        (is_azure, azure_deployment, endpoint) = get_azure_embedding_deployment()
         # update rag_agent
         self.chatter.rag_agent = DocumentEmbedder(
             used=True,
@@ -75,7 +75,7 @@ class SessionData:
             api_key=api_key,
             is_azure=is_azure,
             azure_deployment=azure_deployment,
-            azure_base_url=base_url,
+            azure_endpoint=endpoint,
             connection_args=ragConfig["connectionArgs"],
             # doc_ids=ragConfig["docIds"] if "docIds" in ragConfig else None
         )

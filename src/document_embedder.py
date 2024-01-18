@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 def new_embedder_document(authKey: str, tmpFile: str, filename: str, rag_config: Any, useRAG: Optional[bool] = False):
     api_key = authKey
-    (is_azure, azure_deployment, base_url) = get_azure_embedding_deployment()
+    (is_azure, azure_deployment, endpoint) = get_azure_embedding_deployment()
     rag_agent = DocumentEmbedder(
       used=True,
       use_prompt=useRAG,
@@ -20,7 +20,7 @@ def new_embedder_document(authKey: str, tmpFile: str, filename: str, rag_config:
       api_key=api_key,     
       is_azure=is_azure,
       azure_deployment=azure_deployment, 
-      azure_base_url=base_url,
+      azure_endpoint=endpoint,
       connection_args=rag_config["connectionArgs"]
     )
     rag_agent.connect()
@@ -35,13 +35,13 @@ def new_embedder_document(authKey: str, tmpFile: str, filename: str, rag_config:
     
 def get_all_documents(authKey: str, connection_args: Dict, doc_ids: Optional[List[str]] = None):
     api_key = authKey
-    (is_azure, azure_deployment, base_url) = get_azure_embedding_deployment()
+    (is_azure, azure_deployment, endpoint) = get_azure_embedding_deployment()
     rag_agent = DocumentEmbedder(
         api_key=api_key,
         connection_args=connection_args,
         documentids_workspace=doc_ids,
         is_azure=is_azure,
-        azure_base_url=base_url,
+        azure_endpoint=endpoint,
         azure_deployment=azure_deployment,
     )
     rag_agent.connect()
@@ -49,14 +49,14 @@ def get_all_documents(authKey: str, connection_args: Dict, doc_ids: Optional[Lis
 
 def remove_document(docId: str, authKey: str, connection_args, doc_ids: Optional[List[str]] = None):
     api_key = authKey
-    (is_azure, azure_deployment, base_url) = get_azure_embedding_deployment()
+    (is_azure, azure_deployment, endpoint) = get_azure_embedding_deployment()
     rag_agent = DocumentEmbedder(
         api_key=api_key,
         connection_args=connection_args,
         documentids_workspace=doc_ids,
         is_azure=is_azure,
         azure_deployment=azure_deployment,
-        azure_base_url=base_url
+        azure_endpoint=endpoint
     )
     rag_agent.connect()
     rag_agent.remove_document(doc_id=docId)
@@ -64,13 +64,13 @@ def remove_document(docId: str, authKey: str, connection_args, doc_ids: Optional
 def get_connection_status(connection_args: Optional[Dict]=None, authKey: Optional[str] = None) -> bool:
     if connection_args is None:
         return False
-    (is_azure, azure_deployment, base_url) = get_azure_embedding_deployment()
+    (is_azure, azure_deployment, endpoint) = get_azure_embedding_deployment()
     try:
         rag_agent = DocumentEmbedder(
             api_key=authKey,
             is_azure=is_azure,
             azure_deployment=azure_deployment,
-            azure_base_url=base_url,
+            azure_endpoint=endpoint,
             connection_args=connection_args
         )
         rag_agent.connect()

@@ -31,8 +31,8 @@ def get_auth(request):
     auth = auth if auth is not None and len(auth) > 0 else ""
     return parse_api_key(auth)
 
-def get_azure_embedding_deployment() -> Tuple[bool, str]:
+def get_azure_embedding_deployment() -> Tuple[bool, str, str]:
     is_azure = os.environ.get("OPENAI_API_TYPE", "") == "azure"
-    deployment = os.environ.get("OPENAI_DEPLOYMENT_NAME", "")
-    base_url = os.environ.get("AZURE_OPENAI_ENDPOINT", "")
-    return (is_azure, deployment, base_url)
+    deployment = os.environ.get("AZURE_OPENAI_EMBEDDINGS_DEPLOYMENT_NAME", "")
+    endpoint = os.environ.get("AZURE_OPENAI_ENDPOINT", "")
+    return (is_azure, deployment, endpoint)
