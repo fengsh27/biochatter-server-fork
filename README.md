@@ -26,3 +26,11 @@ docker run -p 5000:5000 -d biochatter-server
 ## API docs
 
 Coming soon.
+
+## Developer
+
+We build the Docker image using the following command to account for ARM and AMD64 architectures:
+
+```console
+docker buildx build --tag biocypher/biochatter-server:latest --tag biocypher/biochatter-server:<version> --platform linux/amd64,linux/arm64 --push .
+```
