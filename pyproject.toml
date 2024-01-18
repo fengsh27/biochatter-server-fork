@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "biochatter-server"
-version = "0.1.0"
+version = "0.1.1"
 description = "the server to host biochatter"
 authors = ["fengsh <shaohong.feng.78@gmail.com>"]
 license = "MIT"
