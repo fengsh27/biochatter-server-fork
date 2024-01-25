@@ -90,7 +90,7 @@ class SessionData:
             azure_deployment=azure_deployment,
             azure_endpoint=endpoint,
             connection_args=ragConfig["connectionArgs"],
-            doc_ids=ragConfig["docIds"] if "docIds" in ragConfig else None
+            documentids_workspace=ragConfig["docIdsWorkspace"] if "docIdsWorkspace" in ragConfig else None
         )
         if useRAG:
             self.chatter.rag_agent.connect()
