@@ -121,13 +121,12 @@ def newDocument():
     tmpFile = extract_and_process_params_from_json_body(jsonBody, 'tmpFile', '')
     filename = extract_and_process_params_from_json_body(jsonBody, 'filename', '')
     ragConfig = extract_and_process_params_from_json_body(jsonBody, 'ragConfig', DEFAULT_RAGCONFIG)
-    useRAG = extract_and_process_params_from_json_body(jsonBody, 'useRAG', False)
     if type(ragConfig) is str:
         ragConfig = json.loads(ragConfig)
     auth = get_auth(request)
     # TODO: consider to be compatible with XinferenceDocumentEmbedder
     try:
-        doc_id = new_embedder_document(authKey=auth,tmpFile=tmpFile, filename=filename, rag_config=ragConfig, useRAG=useRAG)
+        doc_id = new_embedder_document(authKey=auth,tmpFile=tmpFile, filename=filename, rag_config=ragConfig)
         return {"id": doc_id, "code": ERROR_OK}
     except MilvusException as e:
         if e.code == pymilvus.Status.CONNECT_FAILED:
