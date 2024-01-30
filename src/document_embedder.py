@@ -7,12 +7,11 @@ from src.utils import get_azure_embedding_deployment
 
 logger = logging.getLogger(__name__)
 
-def new_embedder_document(authKey: str, tmpFile: str, filename: str, rag_config: Any, useRAG: Optional[bool] = False):
+def new_embedder_document(authKey: str, tmpFile: str, filename: str, rag_config: Any):
     api_key = authKey
     (is_azure, azure_deployment, endpoint) = get_azure_embedding_deployment()
     rag_agent = DocumentEmbedder(
       used=True,
-      use_prompt=useRAG,
       chunk_size=rag_config["chunkSize"],
       chunk_overlap=rag_config["overlapSize"],
       split_by_characters=rag_config["splitByChar"],

@@ -10,3 +10,5 @@ logs/*.log
 # code
 .vscode/
 
+# mac os
+.DS_Store
