@@ -1,9 +1,11 @@
 
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 import os
 
 from flask import Request
 from src.constants import OPENAI_API_KEY
+from langchain.embeddings import OpenAIEmbeddings
+from langchain.embeddings.azure_openai import AzureOpenAIEmbeddings
 
 def parse_api_key(bearToken: str) -> str:
     if not bearToken:
@@ -36,3 +38,22 @@ def get_azure_embedding_deployment() -> Tuple[bool, str, str]:
     deployment = os.environ.get("AZURE_OPENAI_EMBEDDINGS_DEPLOYMENT_NAME", "")
     endpoint = os.environ.get("AZURE_OPENAI_ENDPOINT", "")
     return (is_azure, deployment, endpoint)
+
+def get_embedding_function(
+    is_azure: Optional[bool] = False,
+    api_key: Optional[str] = None,
+    model: Optional[str] = "text-embedding-ada-002",
+    azure_deployment: Optional[str] = None,
+    azure_endpoint: Optional[str] = None,
+):
+    return (
+        OpenAIEmbeddings(api_key=api_key, model=model)
+        if not is_azure else
+        AzureOpenAIEmbeddings(
+            api_key=api_key,
+            azure_deployment=azure_deployment,
+            azure_endpoint=azure_endpoint,
+            model=model,
+        )
+    )
+

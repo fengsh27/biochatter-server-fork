@@ -6,9 +6,8 @@ from biochatter.llm_connect import (
     AzureGptConversation,
     GptConversation,
     WasmConversation,
-    Conversation,
 )
-from biochatter.vectorstore import DocumentEmbedder
+from biochatter.rag_agent import RagAgent, RagAgentModeEnum
 from pprint import pprint
 import threading
 from threading import RLock
@@ -22,6 +21,7 @@ from src.constants import (
 )
 from src.utils import (
     get_azure_embedding_deployment,
+    get_embedding_function,
     get_rag_agent_prompts,
 )
 
@@ -78,22 +78,20 @@ class SessionData:
                 self.chatter.set_api_key(api_key, self.sessionId)
         (is_azure, azure_deployment, endpoint) = get_azure_embedding_deployment()
         # update rag_agent
-        self.chatter.rag_agent = DocumentEmbedder(
-            used=True,
-            use_prompt=useRAG,
-            chunk_size=ragConfig["chunkSize"],
-            chunk_overlap=ragConfig["overlapSize"],
-            split_by_characters=ragConfig["splitByChar"],
-            n_results=ragConfig["resultNum"],
-            api_key=api_key,
+        doc_ids = ragConfig["docIdsWorkspace"] if "docIdsWorkspace" in ragConfig else None
+        embedding_func = get_embedding_function(
             is_azure=is_azure,
             azure_deployment=azure_deployment,
             azure_endpoint=endpoint,
-            connection_args=ragConfig["connectionArgs"],
-            documentids_workspace=ragConfig["docIdsWorkspace"] if "docIdsWorkspace" in ragConfig else None
         )
-        if useRAG:
-            self.chatter.rag_agent.connect()
+        self.chatter.set_rag_agent(RagAgent(
+            mode=RagAgentModeEnum.VectorStore,
+            model_name=os.environ.get(OPENAI_MODEL, "gpt-35-turbo"),
+            connection_args=ragConfig["connectionArgs"],
+            use_prompt=useRAG,
+            embedding_func=embedding_func,
+            documentids_workspace=doc_ids
+        ))        
 
         text = messages[-1]["content"]
         messages = messages[:-1]
