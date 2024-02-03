@@ -12,6 +12,9 @@ from pprint import pprint
 import threading
 from threading import RLock
 from src.constants import (
+    ARGS_CONNECTION_ARGS,
+    ARGS_DOCIDS_WORKSPACE,
+    ARGS_RESULT_NUM,
     AZURE_OPENAI_ENDPOINT,
     OPENAI_API_KEY,
     OPENAI_API_TYPE,
@@ -19,6 +22,7 @@ from src.constants import (
     OPENAI_DEPLOYMENT_NAME,
     OPENAI_MODEL,
 )
+from src.kg_agent import find_schema_info_node
 from src.utils import (
     get_azure_embedding_deployment,
     get_embedding_function,
@@ -45,22 +49,27 @@ MAX_AGE = 3 * 24 * 3600 * 1000  # 3 days
 
 class SessionData:
     def __init__(
-        self, sessionId: str, modelConfig: Dict, chatter: Optional[GptConversation]
+        self,
+        sessionId: str,
+        modelConfig: Dict,
     ):
         self.modelConfig = modelConfig
-        self.chatter: Optional[GptConversation] = chatter
         self.sessionId = sessionId
 
-        self.createdAt = int(datetime.now().timestamp() * 1000)  # in milliseconds
+        self.createdAt = int(datetime.now().timestamp()
+                             * 1000)  # in milliseconds
         self.refreshedAt = self.createdAt
         self.maxAge = MAX_AGE
+        self.chatter = self._create_conversation()
 
     def chat(
         self,
         messages: List[str],
         authKey: str,
         ragConfig: dict,
-        useRAG: Optional[bool] = False,
+        useRAG: bool = False,
+        kgConfig: dict = None,
+        useKG: bool = False,
     ):
         if self.chatter is None:
             return
@@ -75,23 +84,18 @@ class SessionData:
             if not openai.api_key or not hasattr(self.chatter, "chat"):
                 if not authKey:
                     return False
+                # save api_key to os.environ to facilitate conversation_factory
+                # to create conversation
+                if isinstance(self.chatter, GptConversation):
+                    os.environ["OPENAI_API_KEY"] = api_key
                 self.chatter.set_api_key(api_key, self.sessionId)
-        (is_azure, azure_deployment, endpoint) = get_azure_embedding_deployment()
-        # update rag_agent
-        doc_ids = ragConfig["docIdsWorkspace"] if "docIdsWorkspace" in ragConfig else None
-        embedding_func = get_embedding_function(
-            is_azure=is_azure,
-            azure_deployment=azure_deployment,
-            azure_endpoint=endpoint,
+
+        self._update_rags(
+            useRAG=useRAG,
+            ragConfig=ragConfig,
+            useKG=useKG,
+            kgConfig=kgConfig,
         )
-        self.chatter.set_rag_agent(RagAgent(
-            mode=RagAgentModeEnum.VectorStore,
-            model_name=os.environ.get(OPENAI_MODEL, "gpt-35-turbo"),
-            connection_args=ragConfig["connectionArgs"],
-            use_prompt=useRAG,
-            embedding_func=embedding_func,
-            documentids_workspace=doc_ids
-        ))        
 
         text = messages[-1]["content"]
         messages = messages[:-1]
@@ -116,17 +120,9 @@ class SessionData:
             elif msg["role"] == "user":
                 self.chatter.append_user_message(msg["content"])
 
-
-conversationsDict = {}
-
-
-def initialize_conversation(sessionId: str, modelConfig: dict):
-    rlock.acquire()
-    try:
+    def _create_conversation(self):
         if OPENAI_API_TYPE in os.environ and os.environ[OPENAI_API_TYPE] == "azure":
-            logger.info(
-                f"create AzureGptConversation session data for {sessionId} and initialize"
-            )
+            logger.info("create AzureGptConversation")
             chatter = AzureGptConversation(
                 deployment_name=os.environ[OPENAI_DEPLOYMENT_NAME],
                 model_name=os.environ[OPENAI_MODEL],
@@ -135,37 +131,75 @@ def initialize_conversation(sessionId: str, modelConfig: dict):
                 base_url=os.environ[AZURE_OPENAI_ENDPOINT],
             )
             chatter.set_api_key(os.environ[OPENAI_API_KEY])
-            conversationsDict[sessionId] = SessionData(
-                sessionId=sessionId,
-                modelConfig=modelConfig,
-                chatter=chatter,
-            )
         elif (
             OPENAI_API_TYPE in os.environ
             and os.environ[OPENAI_API_TYPE] == "wasm"
-            or modelConfig["model"] == "mistral-wasm"
+            or self.modelConfig["model"] == "mistral-wasm"
         ):
-            logger.info(
-                f"create WasmConversation session data for {sessionId} and initialize"
-            )
+            logger.info("create WasmConversation")
             chatter = WasmConversation("mistral-wasm", prompts={})
-            conversationsDict[sessionId] = SessionData(
-                sessionId=sessionId,
-                modelConfig=modelConfig,
-                chatter=chatter,
-            )
         else:
-            logger.info(
-                f"create GptConversation session data for {sessionId} and initialize"
-            )
+            logger.info("create GptConversation")
             chatter = GptConversation(
                 "gpt-3.5-turbo", prompts={"rag_agent_prompts": get_rag_agent_prompts()}
             )
-            conversationsDict[sessionId] = SessionData(
-                sessionId=sessionId,
-                modelConfig=modelConfig,
-                chatter=chatter,
+            temp_api_key = os.environ.get("OPENAI_API_KEY", None)
+            if temp_api_key is not None:
+                chatter.set_api_key(temp_api_key)
+        return chatter
+
+    def _update_rags(self, useRAG: bool, ragConfig: dict, useKG: bool, kgConfig: dict):
+        # update rag_agent
+        try:
+            (is_azure, azure_deployment, endpoint) = get_azure_embedding_deployment()
+            doc_ids = ragConfig.get(ARGS_DOCIDS_WORKSPACE, None)
+            embedding_func = get_embedding_function(
+                is_azure=is_azure,
+                azure_deployment=azure_deployment,
+                azure_endpoint=endpoint,
             )
+            self.chatter.set_rag_agent(RagAgent(
+                mode=RagAgentModeEnum.VectorStore,
+                model_name=os.environ.get(OPENAI_MODEL, "gpt-3.5-turbo"),
+                connection_args=ragConfig[ARGS_CONNECTION_ARGS],
+                use_prompt=useRAG,
+                embedding_func=embedding_func,
+                documentids_workspace=doc_ids,
+                n_results=ragConfig.get(ARGS_RESULT_NUM, 3)
+            ))
+        except Exception as e:
+            logger.error(e)
+
+        # update kg
+        if not kgConfig or "connectionArgs" not in kgConfig:
+            return
+        try:
+            schema_info = find_schema_info_node(kgConfig["connectionArgs"])
+            if not schema_info:
+                return
+            kg_agent = RagAgent(
+                mode=RagAgentModeEnum.KG,
+                model_name=os.environ.get(OPENAI_MODEL, "gpt-3.5-turbo"),
+                connection_args=kgConfig["connectionArgs"],
+                use_prompt=useKG,
+                schema_config_or_info_dict=schema_info,
+                conversation_factory=self._create_conversation
+            )
+            self.chatter.set_rag_agent(kg_agent)
+        except Exception as e:
+            logger.error(e)
+
+
+conversationsDict = {}
+
+
+def initialize_conversation(sessionId: str, modelConfig: dict):
+    rlock.acquire()
+    try:
+        conversationsDict[sessionId] = SessionData(
+            sessionId=sessionId,
+            modelConfig=modelConfig,
+        )
     except Exception as e:
         logger.error(e)
         raise e
@@ -184,7 +218,7 @@ def has_conversation(sessionId: str) -> bool:
 def get_conversation(sessionId: str) -> Optional[SessionData]:
     rlock.acquire()
     try:
-        if not sessionId in conversationsDict:
+        if sessionId not in conversationsDict:
             initialize_conversation(sessionId, defaultModelConfig.copy())
         return conversationsDict[sessionId]
     except Exception as e:
@@ -197,7 +231,7 @@ def get_conversation(sessionId: str) -> Optional[SessionData]:
 def remove_conversation(sessionId: str):
     rlock.acquire()
     try:
-        if not sessionId in conversationsDict:
+        if sessionId not in conversationsDict:
             return
         del conversationsDict[sessionId]
     except Exception as e:
@@ -207,16 +241,29 @@ def remove_conversation(sessionId: str):
 
 
 def chat(
-    sessionId: str, messages: List[str], authKey: str, ragConfig: dict, useRAG: bool
+    sessionId: str,
+    messages: List[str],
+    authKey: str,
+    ragConfig: dict,
+    useRAG: bool,
+    kgConfig: dict,
+    useKG: bool
 ):
     rlock.acquire()
     try:
         conversation = get_conversation(sessionId=sessionId)
         logger.info(
-            f"get conversation for session id {sessionId}, type of conversation is SessionData {isinstance(conversation, SessionData)}"
+            f"get conversation for session id {sessionId}, "
+            "type of conversation is SessionData "
+            f"{isinstance(conversation, SessionData)}"
         )
         return conversation.chat(
-            messages=messages, authKey=authKey, ragConfig=ragConfig, useRAG=useRAG
+            messages=messages, 
+            authKey=authKey, 
+            ragConfig=ragConfig, 
+            useRAG=useRAG, 
+            kgConfig=kgConfig, 
+            useKG=useKG
         )
     except Exception as e:
         logger.error(e)
@@ -226,7 +273,8 @@ def chat(
 
 
 def recycle_conversations():
-    logger.info(f"[recycle] - {threading.get_native_id()} recycle_conversation")
+    logger.info(
+        f"[recycle] - {threading.get_native_id()} recycle_conversation")
     rlock.acquire()
     now = datetime.now().timestamp() * 1000  # in milliseconds
     sessionsToRemove: List[str] = []
@@ -235,7 +283,9 @@ def recycle_conversations():
             conversation = get_conversation(sessionId=sessionId)
             assert conversation is not None
             logger.info(
-                f"[recycle] sessionId is {sessionId}, refreshAt: {conversation.refreshedAt}, maxAge: {conversation.maxAge}"
+                f"[recycle] sessionId is {sessionId}, "
+                f"refreshAt: {conversation.refreshedAt}, "
+                f"maxAge: {conversation.maxAge}"
             )
             if conversation.refreshedAt + conversation.maxAge < now:
                 sessionsToRemove.append(conversation.sessionId)
