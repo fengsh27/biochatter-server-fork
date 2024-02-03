@@ -7,7 +7,14 @@ import logging
 import os
 from pymilvus import MilvusException
 import pymilvus
-from src.constants import ERROR_MILVUS_CONNECT_FAILED, ERROR_MILVUS_UNKNOWN, ERROR_OK, ERROR_UNKNOW, ERRSTR_MILVUS_CONNECT_FAILED
+from src.constants import (
+    ARGS_CONNECTION_ARGS, 
+    ERROR_MILVUS_CONNECT_FAILED, 
+    ERROR_MILVUS_UNKNOWN, 
+    ERROR_OK, 
+    ERROR_UNKNOW, 
+    ERRSTR_MILVUS_CONNECT_FAILED
+)
 from src.conversation_manager import (
     chat,
     has_conversation, 
@@ -16,11 +23,13 @@ from src.conversation_manager import (
 
 from src.document_embedder import (
     get_all_documents,
-    get_connection_status, 
+    get_connection_status as get_vectorstore_connection_status, 
     new_embedder_document,
     remove_document
 )
+from src.kg_agent import get_connection_status as get_kg_connection_status
 from src.utils import get_auth
+from src.job_recycle_conversations import run_scheduled_job_continuously
 
 # prepare logger
 logging.basicConfig(level=logging.INFO)
@@ -38,7 +47,6 @@ root_logger = logging.getLogger()
 root_logger.addHandler(file_handler)
 root_logger.addHandler(stream_handler)
 
-from src.job_recycle_conversations import run_scheduled_job_continuously
 
 # run scheduled job: recycle unused session
 cease_event = run_scheduled_job_continuously()
@@ -57,21 +65,32 @@ DEFAULT_RAGCONFIG = {
 }
 
 def _process_connection_args(name: str, value: Any) -> Any:
-    if name != "connectionArgs" and name != "ragConfig":
+    if name != ARGS_CONNECTION_ARGS and name != "ragConfig" and \
+        name != "kgConfig":
         return value
 
-    if name == "connectionArgs" and "host" in value and value["host"].lower() == "local":
-        value["host"] = "127.0.0.1" if not "HOST" in os.environ else os.environ["HOST"]
-    elif name == "ragConfig":
+    if name == ARGS_CONNECTION_ARGS and "host" in value and \
+        value["host"].lower() == "local":
+        value["host"] = (
+            "127.0.0.1" if not "HOST" in os.environ else os.environ["HOST"]
+        )
+    elif name == "ragConfig" or name == "kgConfig":
         if type(value) is str:
             value = json.loads(value)
-        if "host" in value["connectionArgs"] and value["connectionArgs"]["host"].lower() == "local":
-            value["connectionArgs"]["host"] = "127.0.0.1" if not "HOST" in os.environ else os.environ["HOST"]
+        if "host" in value[ARGS_CONNECTION_ARGS] and \
+            value[ARGS_CONNECTION_ARGS]["host"].lower() == "local":
+            value[ARGS_CONNECTION_ARGS]["host"] = (
+                "127.0.0.1" if not "HOST" in os.environ else os.environ["HOST"]
+            )
 
     return value
 
 
-def extract_and_process_params_from_json_body(json: Optional[dict], name: str, defaultVal: Optional[Any]) -> Optional[Any]:
+def extract_and_process_params_from_json_body(
+        json: Optional[dict], 
+        name: str, 
+        defaultVal: Optional[Any]
+    ) -> Optional[Any]:
     if not json:
         return defaultVal
     val = json.get(name, defaultVal)
@@ -91,6 +110,8 @@ def handle():
     top_p = extract_and_process_params_from_json_body(jsonBody, "top_p", defaultVal=1)
     ragConfig = extract_and_process_params_from_json_body(jsonBody, "ragConfig", defaultVal=DEFAULT_RAGCONFIG)
     useRAG = extract_and_process_params_from_json_body(jsonBody, "useRAG", defaultVal=False)
+    kgConfig = extract_and_process_params_from_json_body(jsonBody, "kgConfig", defaultVal={})
+    useKG = extract_and_process_params_from_json_body(jsonBody, "useKG", defaultVal=False)
 
     if not has_conversation(sessionId):
         initialize_conversation(
@@ -105,11 +126,24 @@ def handle():
             }
         )
     try:
-        (msg, usage) = chat(sessionId, messages, auth, ragConfig, useRAG)
-        return {"choices": [{"index": 0, "message": {"role": "assistant", "content": msg}, "finish_reason": "stop"}], "usage": usage, "code": ERROR_OK}
+        (msg, usage) = chat(
+            sessionId, messages, auth, ragConfig, useRAG, kgConfig, useKG
+        )
+        return {
+            "choices": [{
+                "index": 0, 
+                "message": {"role": "assistant", "content": msg}, 
+                "finish_reason": "stop"}
+            ], 
+            "usage": usage, 
+            "code": ERROR_OK,
+        }
     except MilvusException as e:
         if e.code == pymilvus.Status.CONNECT_FAILED:
-            return {"error": ERRSTR_MILVUS_CONNECT_FAILED, "code": ERROR_MILVUS_CONNECT_FAILED}
+            return {
+                "error": ERRSTR_MILVUS_CONNECT_FAILED, 
+                "code": ERROR_MILVUS_CONNECT_FAILED,
+            }
         else:
             return {"error": e.message, "code": ERROR_MILVUS_UNKNOWN}
     except Exception as e:
@@ -118,19 +152,33 @@ def handle():
 @app.route('/v1/rag/newdocument', methods=['POST'])
 def newDocument():
     jsonBody = request.json
-    tmpFile = extract_and_process_params_from_json_body(jsonBody, 'tmpFile', '')
-    filename = extract_and_process_params_from_json_body(jsonBody, 'filename', '')
-    ragConfig = extract_and_process_params_from_json_body(jsonBody, 'ragConfig', DEFAULT_RAGCONFIG)
+    tmpFile = extract_and_process_params_from_json_body(
+        jsonBody, 'tmpFile', ''
+    )
+    filename = extract_and_process_params_from_json_body(
+        jsonBody, 'filename', ''
+    )
+    ragConfig = extract_and_process_params_from_json_body(
+        jsonBody, 'ragConfig', DEFAULT_RAGCONFIG
+    )
     if type(ragConfig) is str:
         ragConfig = json.loads(ragConfig)
     auth = get_auth(request)
     # TODO: consider to be compatible with XinferenceDocumentEmbedder
     try:
-        doc_id = new_embedder_document(authKey=auth,tmpFile=tmpFile, filename=filename, rag_config=ragConfig)
+        doc_id = new_embedder_document(
+            authKey=auth,
+            tmpFile=tmpFile, 
+            filename=filename, 
+            rag_config=ragConfig
+        )
         return {"id": doc_id, "code": ERROR_OK}
     except MilvusException as e:
         if e.code == pymilvus.Status.CONNECT_FAILED:
-            return {"error": ERRSTR_MILVUS_CONNECT_FAILED, "code": ERROR_MILVUS_CONNECT_FAILED}
+            return {
+                "error": ERRSTR_MILVUS_CONNECT_FAILED, 
+                "code": ERROR_MILVUS_CONNECT_FAILED
+            }
         else:
             return {"error": e.message, "code": ERROR_MILVUS_UNKNOWN}
     except Exception as e:
@@ -144,15 +192,22 @@ def getAllDocuments():
         return docs
     auth = get_auth(request)
     jsonBody = request.json
-    connection_args = extract_and_process_params_from_json_body(jsonBody, "connectionArgs", None)
-    doc_ids = extract_and_process_params_from_json_body(jsonBody, "docIds", None)
+    connection_args = extract_and_process_params_from_json_body(
+        jsonBody, ARGS_CONNECTION_ARGS, None
+    )
+    doc_ids = extract_and_process_params_from_json_body(
+        jsonBody, "docIds", None
+    )
     try:
         docs = get_all_documents(auth, connection_args, doc_ids=doc_ids)
         docs = post_process(docs)
         return {"documents": docs, "code": ERROR_OK}
     except MilvusException as e:
         if e.code == pymilvus.Status.CONNECT_FAILED:
-            return {"error": ERRSTR_MILVUS_CONNECT_FAILED, "code": ERROR_MILVUS_CONNECT_FAILED}
+            return {
+                "error": ERRSTR_MILVUS_CONNECT_FAILED, 
+                "code": ERROR_MILVUS_CONNECT_FAILED
+            }
         else:
             return {"error": e.message, "code": ERROR_MILVUS_UNKNOWN}
     except Exception as e:
@@ -163,16 +218,26 @@ def removeDocument():
     jsonBody = request.json
     auth = get_auth(request)
     docId = extract_and_process_params_from_json_body(jsonBody, 'docId', '')
-    connection_args = extract_and_process_params_from_json_body(jsonBody, "connectionArgs", None)
+    connection_args = extract_and_process_params_from_json_body(
+        jsonBody, ARGS_CONNECTION_ARGS, None
+    )
     doc_ids = extract_and_process_params_from_json_body(jsonBody, "docIds", None)
     if len(docId) == 0:
         return {"error": "Failed to find document"}
     try:
-        remove_document(docId, authKey=auth, connection_args=connection_args, doc_ids=doc_ids)
+        remove_document(
+            docId, 
+            authKey=auth, 
+            connection_args=connection_args, 
+            doc_ids=doc_ids
+        )
         return {"id": docId, "code": ERROR_OK}
     except MilvusException as e:
         if e.code == pymilvus.Status.CONNECT_FAILED:
-            return {"error": ERRSTR_MILVUS_CONNECT_FAILED, "code": ERROR_MILVUS_CONNECT_FAILED}
+            return {
+                "error": ERRSTR_MILVUS_CONNECT_FAILED, 
+                "code": ERROR_MILVUS_CONNECT_FAILED
+            }
         else:
             return {"error": e.message, "code": ERROR_MILVUS_UNKNOWN}
     except Exception as e:
@@ -183,14 +248,34 @@ def getConnectionStatus():
     try:
         auth = get_auth(request)
         jsonBody = request.json
-        connection_args = extract_and_process_params_from_json_body(jsonBody, "connectionArgs", None)    
-        connected = get_connection_status(connection_args, auth)
-        return {"status": "connected" if connected else "disconnected", "code": ERROR_OK}
+        connection_args = extract_and_process_params_from_json_body(
+            jsonBody, ARGS_CONNECTION_ARGS, None
+        )    
+        connected = get_vectorstore_connection_status(
+            connection_args, auth
+        )
+        return {
+            "status": "connected" if connected else "disconnected", 
+            "code": ERROR_OK
+        }
     except MilvusException as e:
         return {"error": e.message, "code": ERROR_MILVUS_UNKNOWN}
     except Exception as e:
         return {"error": str(e), "code": ERROR_UNKNOW}
     
     
-
+@app.route('/v1/kg/connectionstatus', methods=['POST'])
+def getKGConnectionStatus():
+    try:
+        jsonBody = request.json
+        connection_args = extract_and_process_params_from_json_body(
+            jsonBody, ARGS_CONNECTION_ARGS, None
+        )
+        connected = get_kg_connection_status(connection_args)
+        return {
+            "status": "connected" if connected else "disconnected", 
+            "code": ERROR_OK
+        }
+    except Exception as e:
+        return {"error": str(e), "code": ERROR_UNKNOW}
 

@@ -14,3 +14,12 @@ ERROR_MILVUS_CONNECT_FAILED = 5102
 
 # error string
 ERRSTR_MILVUS_CONNECT_FAILED = "Failed to connect Milvus database"
+
+# arguments
+ARGS_CONNECTION_ARGS = "connectionArgs"
+ARGS_RESULT_NUM = "resultNum"
+ARGS_CHUNK_SIZE = "chunkSize"
+ARGS_OVERLAP_SIZE = "overlapSize"
+ARGS_SPLIT_BY_CHAR = "splitByChar"
+ARGS_DOCIDS_WORKSPACE = "docIdsWorkspace"
+
