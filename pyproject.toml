@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "biochatter-server"
-version = "0.2.2"
+version = "0.2.3"
 description = "Flask server to provide RESTful API for biochatter"
 authors = [
     "fengsh <shaohong.feng.78@gmail.com>",
@@ -11,7 +11,7 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.10,<3.12"
-biochatter = "0.4.3"
+biochatter = "0.4.4"
 Flask = "^3.0.0"
 python-dotenv = "^1.0.0"
 schedule = "^1.2.1"
