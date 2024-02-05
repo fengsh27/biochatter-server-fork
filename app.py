@@ -63,28 +63,21 @@ DEFAULT_RAGCONFIG = {
     "overlapSize": 0,
     "resultNum": 3
 }
+RAG_KG = "KG"
+RAG_VECTORSTORE = "VS"
 
-def _process_connection_args(name: str, value: Any) -> Any:
-    if name != ARGS_CONNECTION_ARGS and name != "ragConfig" and \
-        name != "kgConfig":
-        return value
-
-    if name == ARGS_CONNECTION_ARGS and "host" in value and \
-        value["host"].lower() == "local":
-        value["host"] = (
-            "127.0.0.1" if not "HOST" in os.environ else os.environ["HOST"]
-        )
-    elif name == "ragConfig" or name == "kgConfig":
-        if type(value) is str:
-            value = json.loads(value)
-        if "host" in value[ARGS_CONNECTION_ARGS] and \
-            value[ARGS_CONNECTION_ARGS]["host"].lower() == "local":
-            value[ARGS_CONNECTION_ARGS]["host"] = (
-                "127.0.0.1" if not "HOST" in os.environ else os.environ["HOST"]
+def process_connection_args(rag: str, connection_args: dict) -> dict:
+    if rag == RAG_VECTORSTORE:
+        if connection_args.get('host', '').lower() == 'local':
+            connection_args['host'] = (
+                "127.0.0.1" if "HOST" not in os.environ else os.environ["HOST"]
             )
-
-    return value
-
+    elif rag == RAG_KG:
+        if connection_args.get('host', '').lower() == 'local':
+            connection_args['host'] = (
+                "127.0.0.1" if "KGHOST" not in os.environ else os.environ["KGHOST"]
+            )
+    return connection_args
 
 def extract_and_process_params_from_json_body(
         json: Optional[dict], 
@@ -94,7 +87,6 @@ def extract_and_process_params_from_json_body(
     if not json:
         return defaultVal
     val = json.get(name, defaultVal)
-    val = _process_connection_args(name, val)
     return val
 
 @app.route('/v1/chat/completions', methods=['POST'])
@@ -109,8 +101,10 @@ def handle():
     frequency_penalty = extract_and_process_params_from_json_body(jsonBody, "frequency_penalty", defaultVal=0)
     top_p = extract_and_process_params_from_json_body(jsonBody, "top_p", defaultVal=1)
     ragConfig = extract_and_process_params_from_json_body(jsonBody, "ragConfig", defaultVal=DEFAULT_RAGCONFIG)
+    ragConfig[ARGS_CONNECTION_ARGS] = process_connection_args(RAG_VECTORSTORE, ragConfig[ARGS_CONNECTION_ARGS])
     useRAG = extract_and_process_params_from_json_body(jsonBody, "useRAG", defaultVal=False)
     kgConfig = extract_and_process_params_from_json_body(jsonBody, "kgConfig", defaultVal={})
+    kgConfig[ARGS_CONNECTION_ARGS] = process_connection_args(RAG_KG, kgConfig[ARGS_CONNECTION_ARGS])
     useKG = extract_and_process_params_from_json_body(jsonBody, "useKG", defaultVal=False)
 
     if not has_conversation(sessionId):
@@ -163,6 +157,8 @@ def newDocument():
     )
     if type(ragConfig) is str:
         ragConfig = json.loads(ragConfig)
+    ragConfig[ARGS_CONNECTION_ARGS] \
+        = process_connection_args(RAG_VECTORSTORE, ragConfig[ARGS_CONNECTION_ARGS])
     auth = get_auth(request)
     # TODO: consider to be compatible with XinferenceDocumentEmbedder
     try:
@@ -195,6 +191,7 @@ def getAllDocuments():
     connection_args = extract_and_process_params_from_json_body(
         jsonBody, ARGS_CONNECTION_ARGS, None
     )
+    connection_args = process_connection_args(RAG_VECTORSTORE, connection_args)
     doc_ids = extract_and_process_params_from_json_body(
         jsonBody, "docIds", None
     )
@@ -221,6 +218,7 @@ def removeDocument():
     connection_args = extract_and_process_params_from_json_body(
         jsonBody, ARGS_CONNECTION_ARGS, None
     )
+    connection_args = process_connection_args(RAG_VECTORSTORE, connection_args)
     doc_ids = extract_and_process_params_from_json_body(jsonBody, "docIds", None)
     if len(docId) == 0:
         return {"error": "Failed to find document"}
@@ -250,7 +248,8 @@ def getConnectionStatus():
         jsonBody = request.json
         connection_args = extract_and_process_params_from_json_body(
             jsonBody, ARGS_CONNECTION_ARGS, None
-        )    
+        )
+        connection_args = process_connection_args(RAG_VECTORSTORE, connection_args)
         connected = get_vectorstore_connection_status(
             connection_args, auth
         )
@@ -271,6 +270,7 @@ def getKGConnectionStatus():
         connection_args = extract_and_process_params_from_json_body(
             jsonBody, ARGS_CONNECTION_ARGS, None
         )
+        connection_args = process_connection_args(RAG_KG, connection_args)
         connected = get_kg_connection_status(connection_args)
         return {
             "status": "connected" if connected else "disconnected", 
