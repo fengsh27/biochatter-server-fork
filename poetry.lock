@@ -163,13 +163,13 @@ tests-no-zope = ["attrs[tests-mypy]", "cloudpickle", "hypothesis", "pympler", "p
 
 [[package]]
 name = "biochatter"
-version = "0.4.3"
+version = "0.4.4"
 description = "Backend library for conversational AI in biomedicine"
 optional = false
 python-versions = ">=3.10,<3.12"
 files = [
-    {file = "biochatter-0.4.3-py3-none-any.whl", hash = "sha256:1c11cdf61575f6a3d91a069fc726691a012f219cffa6e2a68e6819fb177a8254"},
-    {file = "biochatter-0.4.3.tar.gz", hash = "sha256:8243d9dcde0d2911f2049fcdc094799ea928e53a32f3238712fdb52c096c8cbf"},
+    {file = "biochatter-0.4.4-py3-none-any.whl", hash = "sha256:ba3f143757e1780ea67c316808fe8a3a62008906ef05a256f3cf8d00b3e9aaf0"},
+    {file = "biochatter-0.4.4.tar.gz", hash = "sha256:06311d53931aa498ac1be50fe6f565b8eb201f66d0abf38259995d81ce475e6a"},
 ]
 
 [package.dependencies]
@@ -555,13 +555,13 @@ typing = ["typing-extensions (>=4.8)"]
 
 [[package]]
 name = "flask"
-version = "3.0.1"
+version = "3.0.2"
 description = "A simple framework for building complex web applications."
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "flask-3.0.1-py3-none-any.whl", hash = "sha256:ca631a507f6dfe6c278ae20112cea3ff54ff2216390bf8880f6b035a5354af13"},
-    {file = "flask-3.0.1.tar.gz", hash = "sha256:6489f51bb3666def6f314e15f19d50a1869a19ae0e8c9a3641ffe66c77d42403"},
+    {file = "flask-3.0.2-py3-none-any.whl", hash = "sha256:3232e0e9c850d781933cf0207523d1ece087eb8d87b23777ae38456e2fbe7c6e"},
+    {file = "flask-3.0.2.tar.gz", hash = "sha256:822c03f4b799204250a7ee84b1eddc40665395333973dfb9deebfe425fefcb7d"},
 ]
 
 [package.dependencies]
@@ -663,13 +663,13 @@ files = [
 
 [[package]]
 name = "fsspec"
-version = "2023.12.2"
+version = "2024.2.0"
 description = "File-system specification"
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "fsspec-2023.12.2-py3-none-any.whl", hash = "sha256:d800d87f72189a745fa3d6b033b9dc4a34ad069f60ca60b943a63599f5501960"},
-    {file = "fsspec-2023.12.2.tar.gz", hash = "sha256:8548d39e8810b59c38014934f6b31e57f40c1b20f911f4cc2b85389c7e9bf0cb"},
+    {file = "fsspec-2024.2.0-py3-none-any.whl", hash = "sha256:817f969556fa5916bc682e02ca2045f96ff7f586d45110fcb76022063ad2c7d8"},
+    {file = "fsspec-2024.2.0.tar.gz", hash = "sha256:b6ad1a679f760dda52b1168c859d01b7b80648ea6f7f7c7f5a8a91dc3f3ecb84"},
 ]
 
 [package.extras]
@@ -687,7 +687,7 @@ github = ["requests"]
 gs = ["gcsfs"]
 gui = ["panel"]
 hdfs = ["pyarrow (>=1)"]
-http = ["aiohttp (!=4.0.0a0,!=4.0.0a1)", "requests"]
+http = ["aiohttp (!=4.0.0a0,!=4.0.0a1)"]
 libarchive = ["libarchive-c"]
 oci = ["ocifs"]
 s3 = ["s3fs"]
@@ -1399,13 +1399,13 @@ files = [
 
 [[package]]
 name = "openai"
-version = "1.10.0"
+version = "1.11.1"
 description = "The official Python library for the openai API"
 optional = false
 python-versions = ">=3.7.1"
 files = [
-    {file = "openai-1.10.0-py3-none-any.whl", hash = "sha256:aa69e97d0223ace9835fbf9c997abe9ee95318f684fd2de6d02c870700c71ebc"},
-    {file = "openai-1.10.0.tar.gz", hash = "sha256:208886cb501b930dc63f48d51db9c15e5380380f80516d07332adad67c9f1053"},
+    {file = "openai-1.11.1-py3-none-any.whl", hash = "sha256:e0f388ce499f53f58079d0c1f571f356f2b168b84d0d24a412506b6abc714980"},
+    {file = "openai-1.11.1.tar.gz", hash = "sha256:f66b8fe431af43e09594147ef3cdcb79758285de72ebafd52be9700a2af41e99"},
 ]
 
 [package.dependencies]
@@ -2805,4 +2805,4 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.10,<3.12"
-content-hash = "8c9c392fccfec7662e15e9770f685d5ceba2cb27934532e2658d26152053f1b0"
+content-hash = "1626b4071fdf010ec16f8a0e35560a5590da7986d3a098e1099030b13e640c29"
