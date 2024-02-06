@@ -145,7 +145,7 @@ class SessionData:
             )
             temp_api_key = os.environ.get("OPENAI_API_KEY", None)
             if temp_api_key is not None:
-                chatter.set_api_key(temp_api_key)
+                chatter.set_api_key(temp_api_key, self.sessionId)
         return chatter
 
     def _update_rags(self, useRAG: bool, ragConfig: dict, useKG: bool, kgConfig: dict):
