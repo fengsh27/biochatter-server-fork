@@ -103,7 +103,8 @@ class SessionData:
         self._setup_messages(messages)
         try:
             (msg, usage, _) = self.chatter.query(text)
-            return (msg, usage)
+            contexts = self.chatter.get_last_inject_context()
+            return (msg, usage, contexts)
         except Exception as e:
             logger.error(e)
             raise e
