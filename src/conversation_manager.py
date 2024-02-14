@@ -56,8 +56,7 @@ class SessionData:
         self.modelConfig = modelConfig
         self.sessionId = sessionId
 
-        self.createdAt = int(datetime.now().timestamp()
-                             * 1000)  # in milliseconds
+        self.createdAt = int(datetime.now().timestamp() * 1000)  # in milliseconds
         self.refreshedAt = self.createdAt
         self.maxAge = MAX_AGE
         self.chatter = self._create_conversation()
@@ -103,7 +102,8 @@ class SessionData:
         self._setup_messages(messages)
         try:
             (msg, usage, _) = self.chatter.query(text)
-            return (msg, usage)
+            contexts = self.chatter.get_last_injected_context()
+            return (msg, usage, contexts)
         except Exception as e:
             logger.error(e)
             raise e
@@ -158,15 +158,17 @@ class SessionData:
                 azure_deployment=azure_deployment,
                 azure_endpoint=endpoint,
             )
-            self.chatter.set_rag_agent(RagAgent(
-                mode=RagAgentModeEnum.VectorStore,
-                model_name=os.environ.get(OPENAI_MODEL, "gpt-3.5-turbo"),
-                connection_args=ragConfig[ARGS_CONNECTION_ARGS],
-                use_prompt=useRAG,
-                embedding_func=embedding_func,
-                documentids_workspace=doc_ids,
-                n_results=ragConfig.get(ARGS_RESULT_NUM, 3)
-            ))
+            self.chatter.set_rag_agent(
+                RagAgent(
+                    mode=RagAgentModeEnum.VectorStore,
+                    model_name=os.environ.get(OPENAI_MODEL, "gpt-3.5-turbo"),
+                    connection_args=ragConfig[ARGS_CONNECTION_ARGS],
+                    use_prompt=useRAG,
+                    embedding_func=embedding_func,
+                    documentids_workspace=doc_ids,
+                    n_results=ragConfig.get(ARGS_RESULT_NUM, 3),
+                )
+            )
         except Exception as e:
             logger.error(e)
 
@@ -183,7 +185,7 @@ class SessionData:
                 connection_args=kgConfig["connectionArgs"],
                 use_prompt=useKG,
                 schema_config_or_info_dict=schema_info,
-                conversation_factory=self._create_conversation
+                conversation_factory=self._create_conversation,
             )
             self.chatter.set_rag_agent(kg_agent)
         except Exception as e:
@@ -247,7 +249,7 @@ def chat(
     ragConfig: dict,
     useRAG: bool,
     kgConfig: dict,
-    useKG: bool
+    useKG: bool,
 ):
     rlock.acquire()
     try:
@@ -258,12 +260,12 @@ def chat(
             f"{isinstance(conversation, SessionData)}"
         )
         return conversation.chat(
-            messages=messages, 
-            authKey=authKey, 
-            ragConfig=ragConfig, 
-            useRAG=useRAG, 
-            kgConfig=kgConfig, 
-            useKG=useKG
+            messages=messages,
+            authKey=authKey,
+            ragConfig=ragConfig,
+            useRAG=useRAG,
+            kgConfig=kgConfig,
+            useKG=useKG,
         )
     except Exception as e:
         logger.error(e)
@@ -273,8 +275,7 @@ def chat(
 
 
 def recycle_conversations():
-    logger.info(
-        f"[recycle] - {threading.get_native_id()} recycle_conversation")
+    logger.info(f"[recycle] - {threading.get_native_id()} recycle_conversation")
     rlock.acquire()
     now = datetime.now().timestamp() * 1000  # in milliseconds
     sessionsToRemove: List[str] = []

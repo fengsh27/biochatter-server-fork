@@ -120,7 +120,7 @@ def handle():
             }
         )
     try:
-        (msg, usage) = chat(
+        (msg, usage, contexts) = chat(
             sessionId, messages, auth, ragConfig, useRAG, kgConfig, useKG
         )
         return {
@@ -130,6 +130,7 @@ def handle():
                 "finish_reason": "stop"}
             ], 
             "usage": usage, 
+            "contexts": contexts,
             "code": ERROR_OK,
         }
     except MilvusException as e:
