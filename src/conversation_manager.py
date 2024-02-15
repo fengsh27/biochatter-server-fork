@@ -186,6 +186,7 @@ class SessionData:
                 use_prompt=useKG,
                 schema_config_or_info_dict=schema_info,
                 conversation_factory=self._create_conversation,
+                n_results=kgConfig.get(ARGS_RESULT_NUM, 3)
             )
             self.chatter.set_rag_agent(kg_agent)
         except Exception as e:
