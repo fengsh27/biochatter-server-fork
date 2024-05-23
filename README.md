@@ -1,6 +1,6 @@
 # biochatter-server
 
-This repository contains the Flask app to provide a RESTful API for
+This repository contains the FastAPI app to provide a RESTful API for
 [BioChatter](https://github.com/biocypher/biochatter). It is used in the
 [ChatGSE Next](https://github.com/biocypher/chatgse-next) web application.
 
