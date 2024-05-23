@@ -25,7 +25,11 @@ docker run -p 5001:5001 -d biochatter-server
 
 ## API docs
 
-Coming soon.
+API docs are work in progress. Use swagger to explore the API by opening /docs URI.
+For example, for localhost it will be:
+```
+http://0.0.0.0:5001/docs
+```
 
 ## Developer
 

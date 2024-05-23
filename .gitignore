@@ -12,3 +12,6 @@ logs/*.log
 
 # mac os
 .DS_Store
+
+# Intellij IDEA
+.idea

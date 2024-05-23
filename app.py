@@ -1,5 +1,9 @@
 import json
 from typing import Optional, Any, List
+
+import uvicorn
+from fastapi import FastAPI
+from starlette.middleware.cors import CORSMiddleware
 from flask import Flask, request
 from dotenv import load_dotenv
 import atexit
@@ -55,7 +59,23 @@ def onExit():
 atexit.register(onExit)
 
 load_dotenv()
-app = Flask(__name__)
+app = FastAPI(
+    # Initialize FastAPI cache with in-memory backend
+    title="Biochatter server API",
+    version="0.2.8",
+    description="API to interact with biochatter server",
+    debug=True
+)
+
+# Configure CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allows all origins
+    allow_credentials=True,
+    allow_methods=["*"],  # Allows all methods
+    allow_headers=["*"],  # Allows all headers
+)
+
 
 DEFAULT_RAGCONFIG = {
     "splitByChar": True,
@@ -89,7 +109,7 @@ def extract_and_process_params_from_json_body(
     val = json.get(name, defaultVal)
     return val
 
-@app.route('/v1/chat/completions', methods=['POST'])
+@app.post('/v1/chat/completions', description="chat completions")
 def handle():
     auth = get_auth(request)
     jsonBody = request.json
@@ -144,7 +164,7 @@ def handle():
     except Exception as e:
         return {"error": str(e)}
 
-@app.route('/v1/rag/newdocument', methods=['POST'])
+@app.post('/v1/rag/newdocument', description="creates new document")
 def newDocument():
     jsonBody = request.json
     tmpFile = extract_and_process_params_from_json_body(
@@ -181,7 +201,7 @@ def newDocument():
     except Exception as e:
         return {"error": str(e), "code": ERROR_UNKNOW}
     
-@app.route('/v1/rag/alldocuments', methods=['POST'])
+@app.post('/v1/rag/alldocuments', description="retrieves all documents")
 def getAllDocuments():
     def post_process(docs: List[Any]):
         for doc in docs:
@@ -211,7 +231,7 @@ def getAllDocuments():
     except Exception as e:
         return {"error": str(e), "code": ERROR_UNKNOW}
     
-@app.route('/v1/rag/document', methods=['DELETE'])
+@app.delete('/v1/rag/document', description="removes a document")
 def removeDocument():
     jsonBody = request.json
     auth = get_auth(request)
@@ -242,7 +262,7 @@ def removeDocument():
     except Exception as e:
         return {"error": str(e), "code": ERROR_UNKNOW}
     
-@app.route('/v1/rag/connectionstatus', methods=['POST'])
+@app.post('/v1/rag/connectionstatus', description="returns connection status")
 def getConnectionStatus():
     try:
         auth = get_auth(request)
@@ -264,7 +284,7 @@ def getConnectionStatus():
         return {"error": str(e), "code": ERROR_UNKNOW}
     
     
-@app.route('/v1/kg/connectionstatus', methods=['POST'])
+@app.post('/v1/kg/connectionstatus', description="returns knowledge graph connection status")
 def getKGConnectionStatus():
     try:
         jsonBody = request.json
@@ -280,3 +300,9 @@ def getKGConnectionStatus():
     except Exception as e:
         return {"error": str(e), "code": ERROR_UNKNOW}
 
+
+if __name__ == "__main__":
+    port: int = 5001
+    uvicorn.run(app,
+                host="0.0.0.0",
+                port=port)
