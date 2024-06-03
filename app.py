@@ -61,7 +61,7 @@ load_dotenv()
 app = FastAPI(
     # Initialize FastAPI cache with in-memory backend
     title="Biochatter server API",
-    version="0.3.0",
+    version="0.3.1",
     description="API to interact with biochatter server",
     debug=True,
 )
