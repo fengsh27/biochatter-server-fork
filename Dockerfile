@@ -7,7 +7,9 @@ WORKDIR /app
 # Install gcc and python3-dev
 RUN apt-get update && apt-get install -y \
     gcc \
-    python3-dev
+    g++ \
+    python3-dev \
+    make
 
 # Copy the poetry.lock and pyproject.toml files to the container
 COPY poetry.lock pyproject.toml ./
@@ -29,7 +31,7 @@ EXPOSE 5001
 CMD ["gunicorn", "-k", "uvicorn.workers.UvicornWorker", "app:app", "--bind", "0.0.0.0:5001", "--timeout", "180"]
 
 # Build the Docker image:
-# docker build -t flask-app .
+# docker build -t biochatter-server .
 
 # Run the Docker container:
-# docker run -p 8000:8000 flask-app
+# docker run -p 5001:5001 biochatter-server
