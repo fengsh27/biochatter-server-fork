@@ -1,4 +1,5 @@
 
+import base64
 from typing import List, Optional, Tuple
 import os
 
@@ -56,4 +57,9 @@ def get_embedding_function(
             model=model,
         )
     )
+
+def build_user_name(session_id: str, api_key: str):
+    username = f"{session_id}:-:{api_key}"
+    encoded = base64.b64encode(username.encode('utf-8'))
+    return encoded.decode('utf-8')
 

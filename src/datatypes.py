@@ -66,7 +66,20 @@ class ChatCompletionsPostModel(BaseModel):
     oncokbConfig: Optional[OncoKBConfig]=None
     useAutoAgent: Optional[bool]=None
     
-    
+class ChatterTypeEnum:
+    Unknown = "Unknown"
+    ServerChatter = "ServerAzureOpenAI"
+    ClientOpenAI = "ClientOpenAI"
+    ClientWASM = "ClientWASM"
+
+class ModelConfig(BaseModel):
+    model: str
+    temperature: float
+    presence_penalty: int
+    frequency_penalty: int
+    top_p: int
+    chatter_type: ChatterTypeEnum
+    openai_api_key: Optional[str]=None
 
 
 

@@ -122,10 +122,10 @@ def extract_and_process_params_from_json_body(
 
 @app.post("/v1/chat/completions", description="chat completions")
 async def handle(
-    authorization: Annotated[str | None, Header()],
     # item: ChatCompletionsPostModel,
     request: Request, # ChatCompletionsPostModel,
 ):
+    authorization = request.headers().get("Authorization")
     auth = get_auth(authorization)
     jsonBody = await request.json()
 
