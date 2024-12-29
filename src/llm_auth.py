@@ -3,7 +3,8 @@
 import os
 from typing import Optional
 
-from langchain_openai import AzureOpenAIEmbeddings, OpenAIEmbeddings
+from langchain_community.embeddings.azure_openai import AzureOpenAIEmbeddings
+from langchain_community.embeddings.openai import OpenAIEmbeddings
 from src.constants import OPENAI_API_KEY
 from src.datatypes import AuthTypeEnum
 

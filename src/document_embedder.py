@@ -26,7 +26,7 @@ def new_embedder_document(
       chunk_overlap=rag_config[ARGS_OVERLAP_SIZE],
       split_by_characters=rag_config[ARGS_SPLIT_BY_CHAR],
       n_results=rag_config[ARGS_RESULT_NUM],
-      embeddings=embedding_function
+      embeddings=embedding_function,
       connection_args=rag_config[ARGS_CONNECTION_ARGS]
     )
     rag_agent.connect()

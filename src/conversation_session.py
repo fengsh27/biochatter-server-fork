@@ -74,7 +74,7 @@ class ConversationSession:
             return None
         client_key = modelConfig.get("openai_api_key", None)
         model = modelConfig.get("model", None)
-        embedding_func = llm_get_embedding_function(client_key=client_key, model=model)
+        embedding_func = llm_get_embedding_function(client_key=client_key)
         self._validate_chatter(modelConfig)        
         
         api_key = self.sessionData.modelConfig.openai_api_key
