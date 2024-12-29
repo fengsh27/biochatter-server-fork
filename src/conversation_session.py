@@ -9,11 +9,14 @@ from biochatter.llm_connect import (
     WasmConversation,
 )
 from biochatter.rag_agent import RagAgent, RagAgentModeEnum
+from langchain_openai import AzureOpenAIEmbeddings, OpenAIEmbeddings
 
-from src.constants import ARGS_CONNECTION_ARGS, ARGS_DOCIDS_WORKSPACE, ARGS_RESULT_NUM, AZURE_OPENAI_ENDPOINT, OPENAI_API_KEY, OPENAI_API_TYPE, OPENAI_API_VERSION, OPENAI_DEPLOYMENT_NAME, OPENAI_MODEL
-from src.datatypes import ModelConfig, ChatterTypeEnum
+from src.constants import ARGS_CONNECTION_ARGS, ARGS_DOCIDS_WORKSPACE, ARGS_RESULT_NUM, ARGS_USE_REFLEXION, AZURE_OPENAI_ENDPOINT, OPENAI_API_KEY, OPENAI_API_TYPE, OPENAI_API_VERSION, OPENAI_DEPLOYMENT_NAME, OPENAI_MODEL
+from src.datatypes import ModelConfig, AuthTypeEnum
 from src.kg_agent import find_schema_info_node
-from src.utils import build_user_name, get_azure_embedding_deployment, get_embedding_function, get_rag_agent_prompts
+from src.llm_auth import llm_get_embedding_function
+from src.token_usage_database import update_token_usage
+from src.utils import build_user_name, get_rag_agent_prompts
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +31,7 @@ defaultModelConfig = {
     "sendMemory": True,
     "historyMessageCount": 4,
     "compressMessageLengthThreshold": 2000,
-    "openai_api_key_type": ChatterTypeEnum.Unknown,
+    "chatter_type": AuthTypeEnum.Unknown.value,
     "openai_api_key": None,
 }
 
@@ -57,7 +60,6 @@ class ConversationSession:
     def chat(
         self,
         messages: List[Dict[str, str]],
-        authKey: str,
         useRAG: bool = False,
         useKG: bool = False,
         useAutoAgent = False,
@@ -67,34 +69,35 @@ class ConversationSession:
         modelConfig: Optional[Dict] = None,
     ):
         if self.chatter is None:
-            return
+            return None
         if not messages or len(messages) == 0:
-            return
-        selfmodelConfig = self.sessionData.modelConfig
-        modelConfig = {**selfmodelConfig, **modelConfig} \
-            if modelConfig is not None else selfmodelConfig
-        self.sessionData.modelConfig = ModelConfig(**modelConfig)
-        self._validate_chatter()
-        api_key = authKey
+            return None
+        client_key = modelConfig.get("openai_api_key", None)
+        model = modelConfig.get("model", None)
+        embedding_func = llm_get_embedding_function(client_key=client_key, model=model)
+        self._validate_chatter(modelConfig)        
+        
+        api_key = self.sessionData.modelConfig.openai_api_key
         if not isinstance(
             self.chatter, AzureGptConversation
+        ) and isinstance(
+            self.chatter, GptConversation
         ):  # chatter is instance of GptConversation
-            import openai
-
             if not hasattr(self.chatter, "chat"):
-                if not authKey:
+                if not api_key:
                     return False
-                user_name = build_user_name(self.sessionId, api_key)
+                user_name = build_user_name(self.sessionData.sessionId, api_key)
                 self.chatter.set_api_key(api_key, user_name)
         chatter = self.chatter
-        chatter.token_usage = {}
-        self._update_rags(
+        # embedding_func = llm_get_embedding_function()
+        self._update_biochatter_agents(
             useRAG=useRAG,
             ragConfig=ragConfig,
             useKG=useKG,
             kgConfig=kgConfig,
             oncokbConfig=oncokbConfig,
             useAutoAgent=useAutoAgent,
+            embedding_function=embedding_func
         )
 
         text = messages[-1]["content"]
@@ -104,7 +107,6 @@ class ConversationSession:
         try:
             (msg, usage, _) = self.chatter.query(text)
             contexts = self.chatter.get_last_injected_context()
-            token_usage = chatter.token_usage
             return (msg, usage, contexts)
         except Exception as e:
             logger.error(e)
@@ -113,43 +115,39 @@ class ConversationSession:
     def _create_conversation(self):
         modelConfig = self.sessionData.modelConfig
         openai_key = modelConfig.openai_api_key
-        if modelConfig.chatter_type == ChatterTypeEnum.ClientOpenAI:
+        if modelConfig.chatter_type == AuthTypeEnum.ClientOpenAI:
             logger.info("create GptConversation")
             chatter = GptConversation(
                 modelConfig.model, # "gpt-3.5-turbo", 
                 prompts={"rag_agent_prompts": get_rag_agent_prompts()},
                 update_token_usage=self._update_token_usage,
             )
-            user_name = build_user_name(self.sessionId, openai_key)
-            chatter.set_api_key(openai_key, user_name) # self.sessionId)
-        elif modelConfig.chatter_type == ChatterTypeEnum.ClientWASM:
+            user_name = build_user_name(self.sessionData.sessionId, openai_key)
+            chatter.set_api_key(openai_key, user_name) # 
+        elif modelConfig.chatter_type == AuthTypeEnum.ClientWASM:
             logger.info("create WasmConversation")
             chatter = WasmConversation("mistral-wasm", prompts={})
-        elif modelConfig.chatter_type == ChatterTypeEnum.ServerChatter:
-            if OPENAI_API_TYPE in os.environ and os.environ[OPENAI_API_TYPE] == "azure": # create AzureGptConversation
-                logger.info("create AzureGptConversation")
-                chatter = AzureGptConversation(
-                    deployment_name=os.environ[OPENAI_DEPLOYMENT_NAME],
-                    model_name=os.environ[OPENAI_MODEL],
-                    prompts={"rag_agent_prompts": get_rag_agent_prompts()},
-                    version=os.environ[OPENAI_API_VERSION],
-                    base_url=os.environ[AZURE_OPENAI_ENDPOINT],
-                    update_token_usage=self._update_token_usage,
-                )
-                chatter.set_api_key(os.environ[OPENAI_API_KEY], "Azure Community")
-            elif OPENAI_API_TYPE in os.environ and os.environ[OPENAI_API_TYPE] == "wasm":
-                logger.info("create WasmConversation")
-                chatter = WasmConversation("mistral-wasm", prompts={})
-            else:
-                logger.info("create GptConversation")
-                chatter = GptConversation(
-                    os.environ.get(OPENAI_MODEL, "gpt-3.5-turbo"),
-                    prompts={"rag_agent_prompts": get_rag_agent_prompts()},
-                    update_token_usage=self._update_token_usage,
-                )  
-                temp_api_key = os.environ.get("OPENAI_API_KEY", None)
-                if temp_api_key is not None:
-                    chatter.set_api_key(temp_api_key, "Gpt Community")
+        elif modelConfig.chatter_type == AuthTypeEnum.ServerAzureOpenAI:
+            logger.info("create AzureGptConversation")
+            chatter = AzureGptConversation(
+                deployment_name=os.environ[OPENAI_DEPLOYMENT_NAME],
+                model_name=os.environ[OPENAI_MODEL],
+                prompts={"rag_agent_prompts": get_rag_agent_prompts()},
+                version=os.environ[OPENAI_API_VERSION],
+                base_url=os.environ[AZURE_OPENAI_ENDPOINT],
+                update_token_usage=self._update_token_usage,
+            )
+            chatter.set_api_key(os.environ[OPENAI_API_KEY], "Azure Community")
+        elif modelConfig.chatter_type == AuthTypeEnum.ServerOpenAI:
+            logger.info("create GptConversation")
+            chatter = GptConversation(
+                os.environ.get(OPENAI_MODEL, "gpt-3.5-turbo"),
+                prompts={"rag_agent_prompts": get_rag_agent_prompts()},
+                update_token_usage=self._update_token_usage,
+            )  
+            temp_api_key = os.environ.get("OPENAI_API_KEY", None)
+            if temp_api_key is not None:
+                chatter.set_api_key(temp_api_key, "Gpt Community")
         else:
             chatter = None
     
@@ -169,10 +167,10 @@ class ConversationSession:
 
     def _disable_biochatter_agent(self, agent_mode: str):
         if self.chatter is None:
-            return
+            return None
         _, agent = self.chatter.find_rag_agent(agent_mode)
         if agent is None:
-            return
+            return None
         agent.use_prompt = False
         self.chatter.set_rag_agent(agent)
 
@@ -181,26 +179,22 @@ class ConversationSession:
         useRAG: bool,
         ragConfig: Optional[Dict]=None,
         useAutoAgent: bool=False,
+        embedding_function: OpenAIEmbeddings | AzureOpenAIEmbeddings | None=None,
     ):
         if ragConfig is None:
             # disabled
-            self._disable_agent(RagAgentModeEnum.VectorStore)            
-            return
+            self._disable_biochatter_agent(RagAgentModeEnum.VectorStore)            
+            return None
         # update rag_agent
         try:
-            (is_azure, azure_deployment, endpoint) = get_azure_embedding_deployment()
             doc_ids = ragConfig.get(ARGS_DOCIDS_WORKSPACE, None)
-            embedding_func = get_embedding_function(
-                is_azure=is_azure,
-                azure_deployment=azure_deployment,
-                azure_endpoint=endpoint,
-            )
+                        
             rag_agent = RagAgent(
                 mode=RagAgentModeEnum.VectorStore,
                 model_name=os.environ.get(OPENAI_MODEL, "gpt-3.5-turbo"),
                 connection_args=ragConfig[ARGS_CONNECTION_ARGS],
                 use_prompt=useRAG or useAutoAgent,
-                embedding_func=embedding_func,
+                embedding_func=embedding_function,
                 documentids_workspace=doc_ids,
                 n_results=ragConfig.get(ARGS_RESULT_NUM, 3),
             )
@@ -217,8 +211,8 @@ class ConversationSession:
         useAutoAgent: bool=False,
     ):
         if kgConfig is None:
-            self._disable_agent(RagAgentModeEnum.KG)
-            return
+            self._disable_biochatter_agent(RagAgentModeEnum.KG)
+            return None
         try:
             schema_info = find_schema_info_node(kgConfig["connectionArgs"])
             if schema_info is not None:
@@ -244,8 +238,8 @@ class ConversationSession:
         useAutoAgent: bool=False,
     ):
         if oncokbConfig is None:
-            self._disable_agent(RagAgentModeEnum.API_ONCOKB)
-            return
+            self._disable_biochatter_agent(RagAgentModeEnum.API_ONCOKB)
+            return None
         oncokb_agent = RagAgent(
             mode=RagAgentModeEnum.API_ONCOKB,
             conversation_factory=self._create_conversation,
@@ -263,26 +257,45 @@ class ConversationSession:
         ragConfig: Optional[Dict]=None,
         kgConfig: Optional[Dict]=None,
         oncokbConfig: Optional[Dict]=None,
+        embedding_function: OpenAIEmbeddings | AzureOpenAIEmbeddings | None=None,
     ):
         self._update_vectorstore_agent(
-            useRAG=useRAG, ragConfig=ragConfig, useAutoAgent=useAutoAgent
+            useRAG=useRAG,
+            ragConfig=ragConfig,
+            useAutoAgent=useAutoAgent,
+            embedding_function=embedding_function,
         )
         self._update_kg_agent(useKG=useKG, kgConfig=kgConfig, useAutoAgent=useAutoAgent)
         self._update_oncokb_agent(oncokbConfig=oncokbConfig, useAutoAgent=useAutoAgent)
         
         self.chatter.use_ragagent_selector = useAutoAgent
 
-    def _validate_chatter(self):
+    def _merge_modelConfig(self, modelConfig: Dict):
+        selfmodelConfig = self.sessionData.modelConfig.model_dump()
+        modelConfig = {**selfmodelConfig, **modelConfig} \
+            if modelConfig is not None else selfmodelConfig
+        self.sessionData.modelConfig = ModelConfig(**modelConfig)
+
+    def _validate_chatter(self, modelConfig: Optional[Dict]=None):
         if self.chatter is None:
+            self._merge_modelConfig(modelConfig)
             self.chatter = self._create_conversation()
             return
-        if (self.sessionData.modelConfig.chatter_type 
-            == ChatterTypeEnum.ClientOpenAI or
-            self.sessionData.modelConfig.chatter_type \
-            == ChatterTypeEnum.ServerOpenAI
-            ):
-            if isinstance(self.chatter, AzureGptConversation):
-                self.chatter = self._create_conversation()
-        else:
-            if isinstance(self.chatter, GptConversation):
-                self.chatter = self._create_conversation()
+
+        if modelConfig is None:
+            return
+
+        if isinstance(self.chatter, AzureGptConversation) and (\
+            modelConfig["chatter_type"] == AuthTypeEnum.ClientOpenAI.value or \
+            modelConfig["chatter_type"] == AuthTypeEnum.ClientWASM.value \
+        ):
+            self._merge_modelConfig(modelConfig)
+            self.chatter = self._create_conversation()
+        elif isinstance(self.chatter, GptConversation) \
+            and modelConfig["openai_api_key"] != \
+                self.sessionData.modelConfig.openai_api_key:
+            self._merge_modelConfig(modelConfig)
+            self.chatter = self._create_conversation()
+
+    def _update_token_usage(self, user: str, model: str, usage: dict):
+        update_token_usage(user, model, usage)

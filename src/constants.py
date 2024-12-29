@@ -24,3 +24,5 @@ ARGS_SPLIT_BY_CHAR = "splitByChar"
 ARGS_DOCIDS_WORKSPACE = "docIdsWorkspace"
 ARGS_USE_REFLEXION = "useReflexion"
 
+DATA_DIR = "DATA_DIR"
+

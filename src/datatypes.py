@@ -1,4 +1,5 @@
 
+from enum import Enum
 from typing import Any, List, Optional
 from pydantic import BaseModel
 
@@ -66,9 +67,10 @@ class ChatCompletionsPostModel(BaseModel):
     oncokbConfig: Optional[OncoKBConfig]=None
     useAutoAgent: Optional[bool]=None
     
-class ChatterTypeEnum:
+class AuthTypeEnum(Enum):
     Unknown = "Unknown"
-    ServerChatter = "ServerAzureOpenAI"
+    ServerAzureOpenAI = "ServerAzureOpenAI"
+    ServerOpenAI = "ServerOpenAI"
     ClientOpenAI = "ClientOpenAI"
     ClientWASM = "ClientWASM"
 
@@ -77,8 +79,8 @@ class ModelConfig(BaseModel):
     temperature: float
     presence_penalty: int
     frequency_penalty: int
-    top_p: int
-    chatter_type: ChatterTypeEnum
+    top_p: Optional[int]=None
+    chatter_type: Optional[AuthTypeEnum]=AuthTypeEnum.Unknown
     openai_api_key: Optional[str]=None
 
 

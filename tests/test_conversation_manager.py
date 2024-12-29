@@ -5,18 +5,23 @@ from src.conversation_manager import (
     initialize_conversation, 
     remove_conversation,
 )
-from src.utils import (
-    parse_api_key
-)
+from src.conversation_session import defaultModelConfig
+from src.llm_auth import _parse_api_key
 
 def test_parse_api_key():
-    res = parse_api_key("Bearer balahbalah")
+    res = _parse_api_key("Bearer balahbalah")
     assert res == "balahbalah"
 
 def test_get_conversation():
-    conversation = get_conversation("balahbalah")
+    modelConfig = {
+        **defaultModelConfig,
+        "chatter_type": "ServerOpenAI",
+    }
+    conversation = get_conversation(
+        sessionId="balahbalah", modelConfig=modelConfig,
+    )
     assert conversation is not None
-    assert conversation.sessionId == "balahbalah"
+    assert conversation.sessionData.sessionId == "balahbalah"
     assert conversation.chatter is not None
     assert has_conversation("balahbalah") 
 
