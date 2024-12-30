@@ -65,8 +65,8 @@ def llm_get_embedding_function(
         endpoint = os.environ.get("AZURE_OPENAI_ENDPOINT", "")
         return AzureOpenAIEmbeddings(
             api_key=llm_get_auth_key(),
-            deployment=deployment,
-            endpoint=endpoint,
+            azure_deployment=deployment,
+            azure_endpoint=endpoint,
             model=model,
         )
     else:
