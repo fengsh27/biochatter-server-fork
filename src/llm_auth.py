@@ -1,12 +1,14 @@
 
 
 import os
-from typing import Optional
+from typing import Optional, Tuple
 
-from langchain_community.embeddings.azure_openai import AzureOpenAIEmbeddings
+from langchain_openai import AzureOpenAIEmbeddings, OpenAIEmbeddings
+# from langchain_community.embeddings.azure_openai import AzureOpenAIEmbeddings
 from langchain_community.embeddings.openai import OpenAIEmbeddings
-from src.constants import OPENAI_API_KEY
+from src.constants import AZURE_COMMUNITY, GPT_COMMUNITY, OPENAI_API_KEY, OPENAI_MODEL
 from src.datatypes import AuthTypeEnum
+from src.utils import encode_user_name
 
 def _parse_api_key(bearToken: str) -> str:
     if not bearToken:
@@ -25,6 +27,22 @@ def llm_get_auth_type(client_key: Optional[str]=None) -> AuthTypeEnum:
         return AuthTypeEnum.ServerOpenAI
     
     return AuthTypeEnum.Unknown
+
+def llm_get_user_name_and_model(
+        client_key: Optional[str]=None,
+        model: Optional[str]=None
+    ) -> Tuple[str, str]:
+    auth_type = llm_get_auth_type(client_key=client_key)
+    if auth_type == AuthTypeEnum.ClientOpenAI:
+        return encode_user_name(client_key), model
+    mod = os.environ.get(
+        OPENAI_MODEL,
+        model if model is not None else "gpt-3.5-turbo",
+    )
+    return (
+        AZURE_COMMUNITY if auth_type == AuthTypeEnum.ServerAzureOpenAI else GPT_COMMUNITY ,
+        mod
+    )
 
 def llm_get_client_auth(authorization: str | None) -> str | None:
     # try to parse bearer key first

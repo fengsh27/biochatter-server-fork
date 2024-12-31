@@ -1,12 +1,6 @@
 
 import base64
 from typing import List, Optional, Tuple
-import os
-
-from flask import Request
-from src.constants import OPENAI_API_KEY
-from langchain.embeddings import OpenAIEmbeddings
-from langchain.embeddings.azure_openai import AzureOpenAIEmbeddings
 
 def get_rag_agent_prompts() -> List[str]:
     return [
@@ -17,8 +11,21 @@ def get_rag_agent_prompts() -> List[str]:
         "you: {statements}",
     ]
     
-def build_user_name(session_id: str, api_key: str):
-    username = f"{session_id}:-:{api_key}"
+USERNAME_SEPARATOR = ":-:"
+def encode_user_name(api_key: str, session_id: Optional[str]=None):
+    if session_id is not None:
+        username = f"{api_key}{USERNAME_SEPARATOR}{session_id}"
+    else:
+        username = api_key
     encoded = base64.b64encode(username.encode('utf-8'))
     return encoded.decode('utf-8')
 
+def decode_user_name(name: str) -> Tuple[str, str | None]:
+    decoded_bytes = base64.b64decode(name.encode("utf-8"))
+    decoded_username = decoded_bytes.decode("utf-8")
+    if USERNAME_SEPARATOR in decoded_username:
+        arr = decoded_username.split(USERNAME_SEPARATOR)
+        assert len(arr) == 2
+        return arr[0], arr[1]
+    else:
+        return decoded_username, None

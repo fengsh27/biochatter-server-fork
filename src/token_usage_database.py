@@ -7,14 +7,22 @@ from typing import Optional
 import logging
 
 from src.constants import (
-    DATA_DIR
+    AZURE_COMMUNITY,
+    DATA_DIR,
+    GPT_COMMUNITY
 )
+from src.datatypes import AuthTypeEnum
+from src.llm_auth import llm_get_auth_type
+from src.utils import encode_user_name
 
 logger = logging.getLogger(__name__)
 
-create_table_query = """
-CREATE TABLE IF NOT EXISTS AzureOpenAITokenUsage (
+TABLE_NAME = "LLMTokenUsage"
+
+create_table_query = f"""
+CREATE TABLE IF NOT EXISTS {TABLE_NAME} (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id TEXT NOT NULL,
     date TEXT NOT NULL,
     hour TEXT NOT NULL,
     user TEXT NOT NULL,
@@ -49,20 +57,20 @@ def _connect_to_db():
             return None
     return sqlite3.connect(db_path)
 
-upsert_usage_query = """
-insert into AzureOpenAITokenUsage(user, model, date, hour, completion_tokens, prompt_tokens, total_tokens) 
-values (?,?,?,?,?,?,?) 
+upsert_usage_query = f"""
+insert into {TABLE_NAME}(user, session_id, model, date, hour, completion_tokens, prompt_tokens, total_tokens) 
+values (?,?,?,?,?,?,?,?) 
 on conflict(user, model, date, hour)
 do update set completion_tokens=completion_tokens+excluded.completion_tokens,
 prompt_tokens=prompt_tokens+excluded.prompt_tokens,
 total_tokens=total_tokens+excluded.total_tokens;
 """
-def _update_token_usage(conn: Connection, user: str, model: str, token_usage: dict):
+def _update_token_usage(conn: Connection, user: str, session_id: str, model: str, token_usage: dict):
     date=strftime("%Y-%m-%d")
     hour=strftime("%H")
     cursor = conn.cursor()        
     cursor.execute(upsert_usage_query,
-                    (user, model, date, hour,
+                    (user, session_id, model, date, hour,
                     token_usage["completion_tokens"],
                     token_usage["prompt_tokens"],
                     token_usage["total_tokens"]))
@@ -71,36 +79,65 @@ def _update_token_usage(conn: Connection, user: str, model: str, token_usage: di
 def _get_token_usage(conn: Connection, user: str, model: str):
     pass
 
-def update_token_usage(user: str, model: str, token_usage: dict):
+def update_token_usage(user: str, session_id: str, model: str, token_usage: dict):
     conn = _connect_to_db()
     if conn is None:
         return
     _ensure_azure_token_usage_tables(conn)
     try:
-        _update_token_usage(conn, user, model, token_usage)
+        _update_token_usage(conn, user, session_id, model, token_usage)
     except Exception as e:
         logger.error(e)
     finally:
         conn.close()
 
-select_usage_query = """
-select completion_tokens, prompt_tokens, total_tokens from AzureOpenAITokenUsage
+select_usage_with_model_query = f"""
+select completion_tokens, prompt_tokens, total_tokens from {TABLE_NAME}
 where user=? and model=? and date=?;
 """
-def get_token_usage(user: str, model: str):
+select_usage_query = f"""
+select completion_tokens, prompt_tokens, total_tokens from {TABLE_NAME}
+where user=? and date=?;
+"""
+def get_token_usage(user: str, model: Optional[str]=None):
     date = strftime("%Y-%m-%d")
     conn = _connect_to_db()
     if conn is None:
         return None
     try:
         cursor = conn.cursor()
-        cursor.execute(select_usage_query, (user, model, date))
+        if model is not None:
+            cursor.execute(select_usage_with_model_query, (user, model, date))
+        else:
+            cursor.execute(select_usage_query, (user, date))
         res = cursor.fetchone()
         cursor.close()
-        return res
+
+        return {
+            "completion_tokens": res[0], 
+            "prompt_tokens": res[1],
+            "total_tokens": res[2],
+        } if res is not None else None
     except Exception as e:
         logger.error(e)
         return None
     finally:
         conn.close()
     
+def get_token_usage_by_client_key(client_key: Optional[str]=None, model: Optional[str]=None):
+    user_name = None
+    if client_key is not None and len(client_key.strip()) > 0:
+        # client key
+        user_name = encode_user_name(client_key)
+    else:
+        # server key
+        auth_type = llm_get_auth_type()
+        user_name = AZURE_COMMUNITY if auth_type == AuthTypeEnum.ServerAzureOpenAI \
+                    else GPT_COMMUNITY
+        
+        
+    
+    res = get_token_usage(user=user_name, model=model)
+    return res
+
+

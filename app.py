@@ -15,10 +15,14 @@ from src.constants import (
     ERROR_MILVUS_CONNECT_FAILED,
     ERROR_MILVUS_UNKNOWN,
     ERROR_OK,
-    ERROR_UNKNOW,
+    ERROR_UNKNOWN,
     ERRSTR_MILVUS_CONNECT_FAILED,
 )
-from src.conversation_manager import chat, has_conversation, initialize_conversation
+from src.conversation_manager import (
+    chat,
+    has_conversation,
+    initialize_conversation,
+)
 
 from src.datatypes import (
     ChatCompletionsPostModel,
@@ -28,6 +32,7 @@ from src.datatypes import (
     RagConnectionStatusPostModel, 
     RagDocumentDeleteModel, 
     RagNewDocumentPostModel,
+    TokenUsagePostModel,
 )
 from src.document_embedder import (
     get_all_documents,
@@ -36,8 +41,14 @@ from src.document_embedder import (
     remove_document,
 )
 from src.kg_agent import get_connection_status as get_kg_connection_status
-from src.llm_auth import llm_get_auth_type, llm_get_client_auth, llm_get_embedding_function
+from src.llm_auth import (
+    llm_get_auth_type,
+    llm_get_client_auth,
+    llm_get_embedding_function,
+    llm_get_user_name_and_model,
+)
 from src.job_recycle_conversations import run_scheduled_job_continuously
+from src.token_usage_database import get_token_usage, get_token_usage_by_client_key
 
 # prepare logger
 logging.basicConfig(level=logging.INFO)
@@ -258,7 +269,7 @@ def newDocument(
         else:
             return {"error": e.message, "code": ERROR_MILVUS_UNKNOWN}
     except Exception as e:
-        return {"error": str(e), "code": ERROR_UNKNOW}
+        return {"error": str(e), "code": ERROR_UNKNOWN}
 
 
 @app.post("/v1/rag/alldocuments", description="retrieves all documents")
@@ -294,7 +305,7 @@ def getAllDocuments(
         else:
             return {"error": e.message, "code": ERROR_MILVUS_UNKNOWN}
     except Exception as e:
-        return {"error": str(e), "code": ERROR_UNKNOW}
+        return {"error": str(e), "code": ERROR_UNKNOWN}
 
 
 @app.delete("/v1/rag/document", description="removes a document")
@@ -328,7 +339,7 @@ def removeDocument(
         else:
             return {"error": e.message, "code": ERROR_MILVUS_UNKNOWN}
     except Exception as e:
-        return {"error": str(e), "code": ERROR_UNKNOW}
+        return {"error": str(e), "code": ERROR_UNKNOWN}
 
 
 @app.post("/v1/rag/connectionstatus", description="returns connection status")
@@ -353,7 +364,7 @@ def getConnectionStatus(
     except MilvusException as e:
         return {"error": e.message, "code": ERROR_MILVUS_UNKNOWN}
     except Exception as e:
-        return {"error": str(e), "code": ERROR_UNKNOW}
+        return {"error": str(e), "code": ERROR_UNKNOWN}
 
 
 @app.post(
@@ -372,7 +383,23 @@ def getKGConnectionStatus(
             "code": ERROR_OK,
         }
     except Exception as e:
-        return {"error": str(e), "code": ERROR_UNKNOW}
+        return {"error": str(e), "code": ERROR_UNKNOWN}
+
+@app.post(
+   "/v1/tokenusage", description="returns token usage for current user"
+)
+def getTokenUsage(
+    authorization: Annotated[str | None, Header()],
+    item: TokenUsagePostModel,
+):
+    try:
+        auth = llm_get_client_auth(authorization=authorization)
+        user, model = llm_get_user_name_and_model(auth, item.model)
+        res = get_token_usage(user, model)
+        return {"code": ERROR_OK, "tokens": res}
+    except Exception as e:
+        logger.error(e)
+        return {"error": str(e), "code": ERROR_UNKNOWN}
 
 
 if __name__ == "__main__":

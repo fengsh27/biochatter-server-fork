@@ -51,6 +51,9 @@ class OncoKBConfig(BaseModel):
     useOncoKB: Optional[bool]=False
     description: Optional[str] = None
 
+class TokenUsagePostModel(BaseModel):
+    model: Optional[str] = None
+
 class ChatCompletionsPostModel(BaseModel):
     session_id: str
     messages: List[Message]
