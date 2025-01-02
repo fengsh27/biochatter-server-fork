@@ -122,11 +122,11 @@ def recycle_conversations():
             assert conversation is not None
             logger.info(
                 f"[recycle] sessionId is {sessionId}, "
-                f"refreshAt: {conversation.refreshedAt}, "
-                f"maxAge: {conversation.maxAge}"
+                f"refreshAt: {conversation.sessionData.refreshedAt}, "
+                f"maxAge: {conversation.sessionData.maxAge}"
             )
-            if conversation.refreshedAt + conversation.maxAge < now:
-                sessionsToRemove.append(conversation.sessionId)
+            if conversation.sessionData.refreshedAt + conversation.sessionData.maxAge < now:
+                sessionsToRemove.append(sessionId)
         for sessionId in sessionsToRemove:
             remove_conversation(sessionId)
     except Exception as e:

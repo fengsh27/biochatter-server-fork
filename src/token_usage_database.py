@@ -110,8 +110,15 @@ def get_token_usage(user: str, model: Optional[str]=None):
             cursor.execute(select_usage_with_model_query, (user, model, date))
         else:
             cursor.execute(select_usage_query, (user, date))
-        res = cursor.fetchone()
+        result = cursor.fetchall()
         cursor.close()
+
+        res = [0, 0, 0]
+        result = result if result is not None else []
+        for item in result:
+            res[0] += item[0]
+            res[1] += item[1]
+            res[2] += item[2]
 
         return {
             "completion_tokens": res[0], 
