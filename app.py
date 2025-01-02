@@ -393,10 +393,17 @@ def getTokenUsage(
     item: TokenUsagePostModel,
 ):
     try:
-        auth = llm_get_client_auth(authorization=authorization)
+        auth = llm_get_client_auth(client_key=authorization)
+        auth_type = llm_get_auth_type(auth)
         user, model = llm_get_user_name_and_model(auth, item.model)
         res = get_token_usage(user, model)
-        return {"code": ERROR_OK, "tokens": res}
+        res = res if res is not None else {
+            "completion_tokens": 0,
+            "prompt_tokens": 0,
+            "total_tokens": 0,
+            "model": model,
+        }
+        return {"code": ERROR_OK, "tokens": res, "auth_type": auth_type.value}
     except Exception as e:
         logger.error(e)
         return {"error": str(e), "code": ERROR_UNKNOWN}

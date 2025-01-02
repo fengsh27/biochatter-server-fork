@@ -44,9 +44,9 @@ def llm_get_user_name_and_model(
         mod
     )
 
-def llm_get_client_auth(authorization: str | None) -> str | None:
+def llm_get_client_auth(client_key: str | None) -> str | None:
     # try to parse bearer key first
-    key = _parse_api_key(authorization)
+    key = _parse_api_key(client_key)
     
     return key if key is not None else ""
 

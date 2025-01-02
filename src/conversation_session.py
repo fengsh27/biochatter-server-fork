@@ -310,6 +310,20 @@ class ConversationSession:
                 self.sessionData.modelConfig.openai_api_key:
             self._merge_modelConfig(modelConfig)
             self.chatter = self._create_conversation()
+        elif modelConfig["chatter_type"] == AuthTypeEnum.ClientOpenAI.value and \
+            ((modelConfig["model"] is not None and
+              modelConfig["model"] != self.sessionData.modelConfig.model) or
+             (modelConfig["openai_api_key"] is not None and
+              modelConfig["openai_api_key"] != self.sessionData.modelConfig.openai_api_key)):
+            ## self.chatter has been created and its type remains the same, but we need to
+            ## change its configuration (model or openai_api_key)
+            self._merge_modelConfig(modelConfig)
+            sessionData = self.sessionData
+            self.chatter.model_name = sessionData.modelConfig.model
+            username = encode_user_name(sessionData.modelConfig.openai_api_key, sessionData.sessionId)
+            self.chatter.set_api_key(self.sessionData.modelConfig.openai_api_key, username)
+        else:
+            self._merge_modelConfig(modelConfig)
 
     def _update_token_usage(self, user: str, model: str, usage: dict):
         user, session_id = decode_user_name(user)
