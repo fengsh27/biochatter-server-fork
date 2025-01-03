@@ -53,6 +53,7 @@ class OncoKBConfig(BaseModel):
 
 class TokenUsagePostModel(BaseModel):
     model: Optional[str] = None
+    session_id: Optional[str] = None
 
 class ChatCompletionsPostModel(BaseModel):
     session_id: str

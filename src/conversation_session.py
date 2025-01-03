@@ -28,7 +28,7 @@ from src.datatypes import ModelConfig, AuthTypeEnum
 from src.kg_agent import find_schema_info_node
 from src.llm_auth import llm_get_embedding_function
 from src.token_usage_database import update_token_usage
-from src.utils import decode_user_name, encode_user_name, get_rag_agent_prompts
+from src.utils import get_rag_agent_prompts
 
 logger = logging.getLogger(__name__)
 
@@ -98,7 +98,9 @@ class ConversationSession:
             if not hasattr(self.chatter, "chat"):
                 if not api_key:
                     return False
-                user_name = encode_user_name(api_key, self.sessionData.sessionId)
+                session_id = self.sessionData.sessionId
+                auth_type = self.sessionData.modelConfig.chatter_type
+                user_name = session_id if auth_type is AuthTypeEnum.ClientOpenAI else GPT_COMMUNITY
                 self.chatter.set_api_key(api_key, user_name)
         chatter = self.chatter
         # embedding_func = llm_get_embedding_function()
@@ -134,7 +136,7 @@ class ConversationSession:
                 prompts={"rag_agent_prompts": get_rag_agent_prompts()},
                 update_token_usage=self._update_token_usage,
             )
-            user_name = encode_user_name(openai_key, self.sessionData.sessionId)
+            user_name = self.sessionData.sessionId
             chatter.set_api_key(openai_key, user_name) # 
         elif modelConfig.chatter_type == AuthTypeEnum.ClientWASM:
             logger.info("create WasmConversation")
@@ -149,7 +151,7 @@ class ConversationSession:
                 base_url=os.environ[AZURE_OPENAI_ENDPOINT],
                 update_token_usage=self._update_token_usage,
             )
-            user_name = encode_user_name(AZURE_COMMUNITY, self.sessionData.sessionId)
+            user_name = AZURE_COMMUNITY
             chatter.set_api_key(os.environ[OPENAI_API_KEY], user_name)
         elif modelConfig.chatter_type == AuthTypeEnum.ServerOpenAI:
             logger.info("create GptConversation")
@@ -159,9 +161,8 @@ class ConversationSession:
                 update_token_usage=self._update_token_usage,
             )  
             temp_api_key = os.environ.get("OPENAI_API_KEY", None)
-            if temp_api_key is not None:
-                user_name = encode_user_name(GPT_COMMUNITY, self.sessionData.sessionId)
-                chatter.set_api_key(temp_api_key, user_name)
+            user_name = GPT_COMMUNITY
+            chatter.set_api_key(temp_api_key, user_name)
         else:
             chatter = None
     
@@ -320,14 +321,11 @@ class ConversationSession:
             self._merge_modelConfig(modelConfig)
             sessionData = self.sessionData
             self.chatter.model_name = sessionData.modelConfig.model
-            username = encode_user_name(sessionData.modelConfig.openai_api_key, sessionData.sessionId)
+            username = sessionData.sessionId
             self.chatter.set_api_key(self.sessionData.modelConfig.openai_api_key, username)
         else:
             self._merge_modelConfig(modelConfig)
 
     def _update_token_usage(self, user: str, model: str, usage: dict):
-        user, session_id = decode_user_name(user)
-        if user != AZURE_COMMUNITY and user != GPT_COMMUNITY:
-            user = encode_user_name(user)
-
+        session_id = self.sessionData.sessionId
         update_token_usage(user, session_id, model, usage)

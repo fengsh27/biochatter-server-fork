@@ -124,27 +124,13 @@ def get_token_usage(user: str, model: Optional[str]=None):
             "completion_tokens": res[0], 
             "prompt_tokens": res[1],
             "total_tokens": res[2],
-        } if res is not None else None
+        } 
     except Exception as e:
         logger.error(e)
         return None
     finally:
         conn.close()
     
-def get_token_usage_by_client_key(client_key: Optional[str]=None, model: Optional[str]=None):
-    user_name = None
-    if client_key is not None and len(client_key.strip()) > 0:
-        # client key
-        user_name = encode_user_name(client_key)
-    else:
-        # server key
-        auth_type = llm_get_auth_type()
-        user_name = AZURE_COMMUNITY if auth_type == AuthTypeEnum.ServerAzureOpenAI \
-                    else GPT_COMMUNITY
-        
-        
-    
-    res = get_token_usage(user=user_name, model=model)
-    return res
+
 
 

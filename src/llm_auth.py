@@ -30,11 +30,12 @@ def llm_get_auth_type(client_key: Optional[str]=None) -> AuthTypeEnum:
 
 def llm_get_user_name_and_model(
         client_key: Optional[str]=None,
+        session_id: Optional[str]=None,
         model: Optional[str]=None
     ) -> Tuple[str, str]:
     auth_type = llm_get_auth_type(client_key=client_key)
     if auth_type == AuthTypeEnum.ClientOpenAI:
-        return encode_user_name(client_key), model
+        return session_id, model
     mod = os.environ.get(
         OPENAI_MODEL,
         model if model is not None else "gpt-3.5-turbo",

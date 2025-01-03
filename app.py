@@ -48,7 +48,7 @@ from src.llm_auth import (
     llm_get_user_name_and_model,
 )
 from src.job_recycle_conversations import run_scheduled_job_continuously
-from src.token_usage_database import get_token_usage, get_token_usage_by_client_key
+from src.token_usage_database import get_token_usage
 
 # prepare logger
 logging.basicConfig(level=logging.INFO)
@@ -395,7 +395,7 @@ def getTokenUsage(
     try:
         auth = llm_get_client_auth(client_key=authorization)
         auth_type = llm_get_auth_type(auth)
-        user, model = llm_get_user_name_and_model(auth, item.model)
+        user, model = llm_get_user_name_and_model(auth, item.session_id, item.model)
         res = get_token_usage(user, model)
         res = res if res is not None else {
             "completion_tokens": 0,
