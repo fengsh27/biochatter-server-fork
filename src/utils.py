@@ -1,6 +1,12 @@
 
 import base64
+import os
 from typing import List, Optional, Tuple
+
+from src.constants import TOKEN_DAILY_LIMITATION
+from src.datatypes import AuthTypeEnum
+from src.llm_auth import llm_get_auth_type, llm_get_user_name_and_model
+from src.token_usage_database import get_token_usage
 
 def get_rag_agent_prompts() -> List[str]:
     return [
@@ -11,21 +17,18 @@ def get_rag_agent_prompts() -> List[str]:
         "you: {statements}",
     ]
     
-USERNAME_SEPARATOR = ":-:"
-def encode_user_name(api_key: str, session_id: Optional[str]=None):
-    if session_id is not None:
-        username = f"{api_key}{USERNAME_SEPARATOR}{session_id}"
-    else:
-        username = api_key
-    encoded = base64.b64encode(username.encode('utf-8'))
-    return encoded.decode('utf-8')
-
-def decode_user_name(name: str) -> Tuple[str, str | None]:
-    decoded_bytes = base64.b64decode(name.encode("utf-8"))
-    decoded_username = decoded_bytes.decode("utf-8")
-    if USERNAME_SEPARATOR in decoded_username:
-        arr = decoded_username.split(USERNAME_SEPARATOR)
-        assert len(arr) == 2
-        return arr[0], arr[1]
-    else:
-        return decoded_username, None
+def need_restrict_usage(client_key: str, model: str) -> Tuple[bool, int]:
+    auth_type = llm_get_auth_type(client_key=client_key)
+    if auth_type == AuthTypeEnum.ClientOpenAI or \
+       auth_type == AuthTypeEnum.ClientWASM:
+        return False, -1
+    limitation = int(os.environ.get(TOKEN_DAILY_LIMITATION, -1))
+    if limitation < 0:
+        return False, -1
+    user_name, actual_model = llm_get_user_name_and_model(
+        client_key=client_key,
+        session_id=None,
+        model=model,
+    )
+    token_usage = get_token_usage(user_name, actual_model)
+    return token_usage["total_tokens"] >= limitation, limitation

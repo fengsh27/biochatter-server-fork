@@ -4,11 +4,15 @@ import os
 from typing import Optional, Tuple
 
 from langchain_openai import AzureOpenAIEmbeddings, OpenAIEmbeddings
-# from langchain_community.embeddings.azure_openai import AzureOpenAIEmbeddings
 from langchain_community.embeddings.openai import OpenAIEmbeddings
-from src.constants import AZURE_COMMUNITY, GPT_COMMUNITY, OPENAI_API_KEY, OPENAI_MODEL
+from src.constants import (
+    AZURE_COMMUNITY,
+    GPT_COMMUNITY,
+    OPENAI_API_KEY,
+    OPENAI_MODEL,
+    TOKEN_DAILY_LIMITATION
+)
 from src.datatypes import AuthTypeEnum
-from src.utils import encode_user_name
 
 def _parse_api_key(bearToken: str) -> str:
     if not bearToken:
@@ -27,6 +31,15 @@ def llm_get_auth_type(client_key: Optional[str]=None) -> AuthTypeEnum:
         return AuthTypeEnum.ServerOpenAI
     
     return AuthTypeEnum.Unknown
+
+def llm_get_auth_token_limitation(auth_type: AuthTypeEnum) -> int:
+    if auth_type is AuthTypeEnum.ClientOpenAI:
+        return -1
+    if auth_type is AuthTypeEnum.ServerAzureOpenAI or \
+       auth_type is AuthTypeEnum.ServerOpenAI:
+        return os.environ.get(TOKEN_DAILY_LIMITATION, -1)
+    
+    return -1
 
 def llm_get_user_name_and_model(
         client_key: Optional[str]=None,

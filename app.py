@@ -12,6 +12,7 @@ from pymilvus import MilvusException
 import pymilvus
 from src.constants import (
     ARGS_CONNECTION_ARGS,
+    ERROR_EXCEEDS_TOKEN_USAGE,
     ERROR_MILVUS_CONNECT_FAILED,
     ERROR_MILVUS_UNKNOWN,
     ERROR_OK,
@@ -42,6 +43,7 @@ from src.document_embedder import (
 )
 from src.kg_agent import get_connection_status as get_kg_connection_status
 from src.llm_auth import (
+    llm_get_auth_token_limitation,
     llm_get_auth_type,
     llm_get_client_auth,
     llm_get_embedding_function,
@@ -49,6 +51,7 @@ from src.llm_auth import (
 )
 from src.job_recycle_conversations import run_scheduled_job_continuously
 from src.token_usage_database import get_token_usage
+from src.utils import need_restrict_usage
 
 # prepare logger
 logging.basicConfig(level=logging.INFO)
@@ -139,6 +142,7 @@ async def handle(
 ):
     authorization = request.headers.get("Authorization")
     auth = llm_get_client_auth(authorization)
+    auth_type = llm_get_auth_type(auth)
     jsonBody = await request.json()
 
     sessionId = extract_and_process_params_from_json_body(
@@ -196,6 +200,13 @@ async def handle(
         "chatter_type": llm_get_auth_type(auth).value,
         "openai_api_key": auth,
     }
+
+    restrict, limitation = need_restrict_usage(client_key=auth, model=model)
+    if restrict:
+        return {
+            "code": ERROR_EXCEEDS_TOKEN_USAGE,
+            "limitation": limitation
+        }
     if not has_conversation(sessionId):
         initialize_conversation(
             sessionId=sessionId,

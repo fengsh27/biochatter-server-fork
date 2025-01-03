@@ -11,9 +11,6 @@ from src.constants import (
     DATA_DIR,
     GPT_COMMUNITY
 )
-from src.datatypes import AuthTypeEnum
-from src.llm_auth import llm_get_auth_type
-from src.utils import encode_user_name
 
 logger = logging.getLogger(__name__)
 
@@ -75,9 +72,6 @@ def _update_token_usage(conn: Connection, user: str, session_id: str, model: str
                     token_usage["prompt_tokens"],
                     token_usage["total_tokens"]))
     conn.commit()
-
-def _get_token_usage(conn: Connection, user: str, model: str):
-    pass
 
 def update_token_usage(user: str, session_id: str, model: str, token_usage: dict):
     conn = _connect_to_db()
