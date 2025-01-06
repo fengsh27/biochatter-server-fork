@@ -1,11 +1,9 @@
 
 from unittest import TestCase
 from dotenv import load_dotenv
-import os
 
 from src.conversation_session import (
     ConversationSession,
-    SessionData,
     defaultModelConfig,
 )
 
@@ -49,5 +47,4 @@ class TestConversationSession(TestCase):
             modelConfig=modelConfig,
         )
         self.assertIsNot(res, None)
-
 

@@ -90,11 +90,10 @@ class ConversationSession:
         self._validate_chatter(modelConfig)        
         
         api_key = self.sessionData.modelConfig.openai_api_key
-        if not isinstance(
-            self.chatter, AzureGptConversation
-        ) and isinstance(
-            self.chatter, GptConversation
-        ):  # chatter is instance of GptConversation
+        selfModelConfig = self.sessionData.modelConfig
+        if selfModelConfig.chatter_type is AuthTypeEnum.ServerOpenAI or \
+            selfModelConfig.chatter_type is AuthTypeEnum.ClientOpenAI:
+            # chatter is instance of GptConversation
             if not hasattr(self.chatter, "chat"):
                 if not api_key:
                     return False
@@ -287,9 +286,12 @@ class ConversationSession:
 
     def _merge_modelConfig(self, modelConfig: Dict):
         selfmodelConfig = self.sessionData.modelConfig.model_dump()
-        modelConfig = {**selfmodelConfig, **modelConfig} \
+        mergedModelConfig = {**selfmodelConfig, **modelConfig} \
             if modelConfig is not None else selfmodelConfig
-        self.sessionData.modelConfig = ModelConfig(**modelConfig)
+        mergedModelConfig["openai_api_key"] = \
+            modelConfig["openai_api_key"] if "openai_api_key" in modelConfig else None
+        self.sessionData.modelConfig = ModelConfig(**mergedModelConfig)
+        
 
     def _validate_chatter(self, modelConfig: Optional[Dict]=None):
         if self.chatter is None:
@@ -299,29 +301,25 @@ class ConversationSession:
 
         if modelConfig is None:
             return
-
-        if isinstance(self.chatter, AzureGptConversation) and (\
-            modelConfig["chatter_type"] == AuthTypeEnum.ClientOpenAI.value or \
-            modelConfig["chatter_type"] == AuthTypeEnum.ClientWASM.value \
+        
+        selfModelConfig = self.sessionData.modelConfig
+        selfChatterType = selfModelConfig.chatter_type.value[:6]
+        chatterType = modelConfig["chatter_type"][:6]
+        if (selfChatterType == "Server" and chatterType == "Client") or \
+            (selfChatterType == "Client" and chatterType == "Server"):
+            # Switch server api key to client api key or client api key to 
+            # server api key
+            self._merge_modelConfig(modelConfig)
+            self.chatter = self._create_conversation()
+        elif (chatterType == "Client" and (
+            selfModelConfig.openai_api_key != modelConfig["openai_api_key"]) or 
+            (modelConfig["model"] is not None and
+              modelConfig["model"] != self.sessionData.modelConfig.model)
         ):
+            # Change client api key
             self._merge_modelConfig(modelConfig)
-            self.chatter = self._create_conversation()
-        elif isinstance(self.chatter, GptConversation) \
-            and modelConfig["openai_api_key"] != \
-                self.sessionData.modelConfig.openai_api_key:
-            self._merge_modelConfig(modelConfig)
-            self.chatter = self._create_conversation()
-        elif modelConfig["chatter_type"] == AuthTypeEnum.ClientOpenAI.value and \
-            ((modelConfig["model"] is not None and
-              modelConfig["model"] != self.sessionData.modelConfig.model) or
-             (modelConfig["openai_api_key"] is not None and
-              modelConfig["openai_api_key"] != self.sessionData.modelConfig.openai_api_key)):
-            ## self.chatter has been created and its type remains the same, but we need to
-            ## change its configuration (model or openai_api_key)
-            self._merge_modelConfig(modelConfig)
-            sessionData = self.sessionData
-            self.chatter.model_name = sessionData.modelConfig.model
-            username = sessionData.sessionId
+            self.chatter.model_name = self.sessionData.modelConfig.model
+            username = self.sessionData.sessionId
             self.chatter.set_api_key(self.sessionData.modelConfig.openai_api_key, username)
         else:
             self._merge_modelConfig(modelConfig)
