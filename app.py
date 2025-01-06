@@ -12,7 +12,7 @@ from pymilvus import MilvusException
 import pymilvus
 from src.constants import (
     ARGS_CONNECTION_ARGS,
-    ERROR_EXCEEDS_TOKEN_USAGE,
+    ERROR_EXCEEDS_TOKEN_LIMIT,
     ERROR_MILVUS_CONNECT_FAILED,
     ERROR_MILVUS_UNKNOWN,
     ERROR_OK,
@@ -204,7 +204,7 @@ async def handle(
     restrict, limitation = need_restrict_usage(client_key=auth, model=model)
     if restrict:
         return {
-            "code": ERROR_EXCEEDS_TOKEN_USAGE,
+            "code": ERROR_EXCEEDS_TOKEN_LIMIT,
             "limitation": limitation
         }
     if not has_conversation(sessionId):

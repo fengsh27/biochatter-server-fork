@@ -98,6 +98,7 @@ def get_token_usage(user: str, model: Optional[str]=None):
     conn = _connect_to_db()
     if conn is None:
         return None
+    _ensure_azure_token_usage_tables(conn)
     try:
         cursor = conn.cursor()
         if model is not None:
