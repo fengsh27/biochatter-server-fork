@@ -27,7 +27,7 @@ def llm_get_auth_type(client_key: Optional[str]=None) -> AuthTypeEnum:
     
     if os.environ.get("OPENAI_API_TYPE", "") == "azure":
         return AuthTypeEnum.ServerAzureOpenAI
-    if len(os.environ.get("OPENAI_API_KEY", "") > 0):
+    if len(os.environ.get("OPENAI_API_KEY", "")) > 0:
         return AuthTypeEnum.ServerOpenAI
     
     return AuthTypeEnum.Unknown
