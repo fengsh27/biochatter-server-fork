@@ -54,9 +54,15 @@ def llm_get_user_name_and_model(
         model if model is not None else "gpt-3.5-turbo",
     )
     return (
-        AZURE_COMMUNITY if auth_type == AuthTypeEnum.ServerAzureOpenAI else GPT_COMMUNITY ,
+        AZURE_COMMUNITY if auth_type == AuthTypeEnum.ServerAzureOpenAI else GPT_COMMUNITY,
         mod
     )
+
+def llm_get_user_name_by_AuthType(auth_type: AuthTypeEnum, session_id: str) -> str:
+    if auth_type == AuthTypeEnum.ClientOpenAI:
+        return session_id
+    return AZURE_COMMUNITY if auth_type == AuthTypeEnum.ServerAzureOpenAI \
+        else GPT_COMMUNITY
 
 def llm_get_client_auth(client_key: str | None) -> str | None:
     # try to parse bearer key first

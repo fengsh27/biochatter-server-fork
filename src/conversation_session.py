@@ -26,7 +26,10 @@ from src.constants import (
 )
 from src.datatypes import ModelConfig, AuthTypeEnum
 from src.kg_agent import find_schema_info_node
-from src.llm_auth import llm_get_embedding_function
+from src.llm_auth import (
+    llm_get_embedding_function,
+    llm_get_user_name_by_AuthType,
+)
 from src.token_usage_database import update_token_usage
 from src.utils import get_rag_agent_prompts
 
@@ -293,6 +296,26 @@ class ConversationSession:
         self.sessionData.modelConfig = ModelConfig(**mergedModelConfig)
         
 
+    def _is_auth_type_changed(self, modelConfig: Dict) -> bool:
+        selfModelConfig = self.sessionData.modelConfig
+        selfChatterType = selfModelConfig.chatter_type.value[:6]
+        chatterType = modelConfig["chatter_type"][:6]
+        return (selfChatterType == "Server" and chatterType == "Client") or \
+            (selfChatterType == "Client" and chatterType == "Server")
+    
+    def _is_openai_key_or_model_changed(self, modelConfig: Dict) -> bool:
+        selfModelConfig = self.sessionData.modelConfig
+        chatterType = modelConfig["chatter_type"][:6]
+        return ((
+                chatterType == "Client" and
+                selfModelConfig.openai_api_key != modelConfig["openai_api_key"]
+            ) or (
+                modelConfig["model"] is not None and
+                (modelConfig["model"] != selfModelConfig.model or
+                 modelConfig["model"] != self.chatter.model_name)
+            )
+        )
+
     def _validate_chatter(self, modelConfig: Optional[Dict]=None):
         if self.chatter is None:
             self._merge_modelConfig(modelConfig)
@@ -301,25 +324,19 @@ class ConversationSession:
 
         if modelConfig is None:
             return
-        
-        selfModelConfig = self.sessionData.modelConfig
-        selfChatterType = selfModelConfig.chatter_type.value[:6]
-        chatterType = modelConfig["chatter_type"][:6]
-        if (selfChatterType == "Server" and chatterType == "Client") or \
-            (selfChatterType == "Client" and chatterType == "Server"):
+                
+        if self._is_auth_type_changed(modelConfig=modelConfig):
             # Switch server api key to client api key or client api key to 
             # server api key
             self._merge_modelConfig(modelConfig)
             self.chatter = self._create_conversation()
-        elif (chatterType == "Client" and (
-            selfModelConfig.openai_api_key != modelConfig["openai_api_key"]) or 
-            (modelConfig["model"] is not None and
-              modelConfig["model"] != self.sessionData.modelConfig.model)
-        ):
-            # Change client api key
+        elif self._is_openai_key_or_model_changed(modelConfig=modelConfig):
+            # Change client api key or model
             self._merge_modelConfig(modelConfig)
+            selfModelConfig = self.sessionData.modelConfig
             self.chatter.model_name = self.sessionData.modelConfig.model
-            username = self.sessionData.sessionId
+            session_id = self.sessionData.sessionId
+            username = llm_get_user_name_by_AuthType(selfModelConfig.chatter_type, session_id)
             self.chatter.set_api_key(self.sessionData.modelConfig.openai_api_key, username)
         else:
             self._merge_modelConfig(modelConfig)
