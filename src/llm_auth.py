@@ -4,7 +4,6 @@ import os
 from typing import Optional, Tuple
 
 from langchain_openai import AzureOpenAIEmbeddings, OpenAIEmbeddings
-from langchain_community.embeddings.openai import OpenAIEmbeddings
 from src.constants import (
     AZURE_COMMUNITY,
     GPT_COMMUNITY,

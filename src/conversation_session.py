@@ -306,10 +306,9 @@ class ConversationSession:
     def _is_openai_key_or_model_changed(self, modelConfig: Dict) -> bool:
         selfModelConfig = self.sessionData.modelConfig
         chatterType = modelConfig["chatter_type"][:6]
-        return ((
-                chatterType == "Client" and
+        return chatterType == "Client" and (
                 selfModelConfig.openai_api_key != modelConfig["openai_api_key"]
-            ) or (
+            or (
                 modelConfig["model"] is not None and
                 (modelConfig["model"] != selfModelConfig.model or
                  modelConfig["model"] != self.chatter.model_name)
