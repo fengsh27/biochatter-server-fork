@@ -198,7 +198,7 @@ class ConversationSession:
         useAutoAgent: bool=False,
         embedding_function: OpenAIEmbeddings | AzureOpenAIEmbeddings | None=None,
     ):
-        if ragConfig is None:
+        if ragConfig is None or not useRAG:
             # disabled
             self._disable_biochatter_agent(RagAgentModeEnum.VectorStore)            
             return None
@@ -227,7 +227,7 @@ class ConversationSession:
         kgConfig: Optional[Dict]=None,
         useAutoAgent: bool=False,
     ):
-        if kgConfig is None:
+        if kgConfig is None or not useKG:
             self._disable_biochatter_agent(RagAgentModeEnum.KG)
             return None
         try:
