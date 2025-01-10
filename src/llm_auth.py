@@ -1,5 +1,6 @@
 
 
+from functools import wraps
 import os
 from typing import Optional, Tuple
 
@@ -8,6 +9,7 @@ from src.constants import (
     AZURE_COMMUNITY,
     GPT_COMMUNITY,
     OPENAI_API_KEY,
+    OPENAI_API_TYPE,
     OPENAI_MODEL,
     TOKEN_DAILY_LIMITATION
 )
@@ -83,11 +85,29 @@ def llm_get_auth_key(client_key: Optional[str]=None):
     
     return auth
 
-def llm_get_embedding_function(
-        client_key: Optional[str]=None,
-        model: Optional[str] = "text-embedding-ada-002",
-    ) -> OpenAIEmbeddings | AzureOpenAIEmbeddings | None:
-    auth_type = llm_get_auth_type(client_key)
+def save_and_restore_openai_type(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        if "auth_type" in kwargs:
+            auth_type = kwargs.get("auth_type", AuthTypeEnum.Unknown)
+        else:
+            auth_type = args[0]
+        openai_type = ""
+        if auth_type == AuthTypeEnum.ClientOpenAI:
+            openai_type = os.environ.get(OPENAI_API_TYPE, "")
+            os.environ[OPENAI_API_TYPE] = ""
+        result = func(*args, **kwargs)
+        if auth_type == AuthTypeEnum.ClientOpenAI and len(openai_type) > 0:
+            os.environ[OPENAI_API_TYPE] = openai_type
+        return result
+    return wrapper
+    
+@save_and_restore_openai_type
+def _get_embedding_function(
+    auth_type: AuthTypeEnum,
+    client_key: str,
+    model: str,
+):
     if auth_type == AuthTypeEnum.ClientOpenAI:
         return OpenAIEmbeddings(
             api_key=client_key,
@@ -108,3 +128,15 @@ def llm_get_embedding_function(
         )
     else:
         return None
+
+def llm_get_embedding_function(
+        client_key: Optional[str]=None,
+        model: Optional[str] = "text-embedding-ada-002",
+    ) -> OpenAIEmbeddings | AzureOpenAIEmbeddings | None:
+    auth_type = llm_get_auth_type(client_key)
+    return _get_embedding_function(
+        auth_type=auth_type,
+        client_key=client_key,
+        model=model,
+    )
+    

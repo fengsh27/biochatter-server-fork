@@ -265,7 +265,7 @@ def newDocument(
     # TODO: consider to be compatible with XinferenceDocumentEmbedder
     try:
         doc_id = new_embedder_document(
-            tmpFile=tmpFile,
+            tmp_file=tmpFile,
             filename=filename,
             rag_config=ragConfig,
             embedding_function=embedding_func

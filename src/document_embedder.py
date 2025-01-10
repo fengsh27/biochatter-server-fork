@@ -15,7 +15,7 @@ from src.constants import (
 logger = logging.getLogger(__name__)
 
 def new_embedder_document(
-        tmpFile: str, 
+        tmp_file: str, 
         filename: str, 
         rag_config: Any,
         embedding_function: OpenAIEmbeddings | AzureOpenAIEmbeddings | None,
@@ -31,7 +31,7 @@ def new_embedder_document(
     )
     rag_agent.connect()
     reader = DocumentReader()
-    docs = reader.load_document(tmpFile)
+    docs = reader.load_document(tmp_file)
     if len(docs) > 0:
         for doc in docs:
             doc.metadata.update({"source": filename})
@@ -53,7 +53,7 @@ def get_all_documents(
     return rag_agent.get_all_documents()
 
 def remove_document(
-        docId: str,
+        doc_id: str,
         connection_args, 
         doc_ids: Optional[List[str]] = None,
         embedding_function: OpenAIEmbeddings | AzureOpenAIEmbeddings | None=None,
@@ -64,7 +64,7 @@ def remove_document(
         embeddings=embedding_function,
     )
     rag_agent.connect()
-    rag_agent.remove_document(doc_id=docId)
+    rag_agent.remove_document(doc_id=doc_id)
 
 def get_connection_status(
         connection_args: Optional[Dict]=None,
