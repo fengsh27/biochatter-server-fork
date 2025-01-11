@@ -36,7 +36,6 @@ def new_embedder_document(
         for doc in docs:
             doc.metadata.update({"source": filename})
     logger.info('save_document')
-    logger.error('save_document')
     return rag_agent.save_document(docs)
 
 def get_all_documents(

@@ -13,7 +13,7 @@ from src.constants import (
     OPENAI_MODEL,
     TOKEN_DAILY_LIMITATION
 )
-from src.datatypes import AuthTypeEnum
+from src.datatypes import AuthTypeEnum, ModelConfig
 
 def _parse_api_key(bearToken: str) -> str:
     if not bearToken:
@@ -50,20 +50,32 @@ def llm_get_user_name_and_model(
     auth_type = llm_get_auth_type(client_key=client_key)
     if auth_type == AuthTypeEnum.ClientOpenAI:
         return session_id, model
-    mod = os.environ.get(
-        OPENAI_MODEL,
-        model if model is not None else "gpt-3.5-turbo",
-    )
+    mod = llm_get_model_by_AuthType(auth_type, model)
     return (
         AZURE_COMMUNITY if auth_type == AuthTypeEnum.ServerAzureOpenAI else GPT_COMMUNITY,
         mod
     )
+
+def llm_get_model_by_AuthType(auth_type: AuthTypeEnum | None, model: Optional[str]):
+    default_model = model if model is not None and len(model) > 0 else "gpt-3.5-turbo"
+    if auth_type is None or auth_type == AuthTypeEnum.ClientOpenAI:
+        return default_model
+    
+    model = os.environ.get(OPENAI_MODEL, default_model)
+    return model if len(model) > 0 else default_model
 
 def llm_get_user_name_by_AuthType(auth_type: AuthTypeEnum, session_id: str) -> str:
     if auth_type == AuthTypeEnum.ClientOpenAI:
         return session_id
     return AZURE_COMMUNITY if auth_type == AuthTypeEnum.ServerAzureOpenAI \
         else GPT_COMMUNITY
+
+def llm_get_auth_key_by_AuthType(auth_type: AuthTypeEnum, modelConfig: ModelConfig):
+    at = auth_type.value
+    if at[:6] == "Server":
+        return os.environ.get(OPENAI_API_KEY, "")
+    else:
+        return modelConfig.openai_api_key
 
 def llm_get_client_auth(client_key: str | None) -> str | None:
     # try to parse bearer key first

@@ -183,3 +183,38 @@ class TestConversationSession(TestCase):
         self.assertEqual(session.sessionData.modelConfig.chatter_type, AuthTypeEnum.ClientOpenAI)
         self.assertEqual(session.chatter.model_name, "gpt-4o")
 
+class TestConversationSessionServerOpenAI(TestCase):
+    def setUp(self):
+        self.patch_os = patch.dict(os.environ, {
+            OPENAI_API_KEY: "abcdefg",
+        })
+        self.patch_os.start()
+
+        self.addCleanup(self.patch_os.stop)
+        
+        return super().setUp()
+    
+    def tearDown(self):
+        return super().tearDown()
+    
+    @patch("src.conversation_session.AzureGptConversation")
+    @patch("src.conversation_session.GptConversation")
+    def test_validate_chatter_server_change_model(self, mock_GptConversation, mock_AzureGptConversation):
+        modelConfig = {**defaultModelConfig}
+        modelConfig["chatter_type"] = "ServerOpenAI"
+        modelConfig["model"] = "gpt-3.5-turbo"
+        session = ConversationSession(
+            "abcdefg",
+            modelConfig
+        )
+
+        mock_GptConversation.assert_called_once()
+
+        session._validate_chatter(
+            modelConfig={
+                "chatter_type": AuthTypeEnum.ServerOpenAI.value,
+                "model": "gpt-4o",
+            }
+        )
+        self.assertEqual(session.sessionData.modelConfig.chatter_type, AuthTypeEnum.ServerOpenAI)
+        self.assertEqual(session.chatter.model_name, "gpt-4o")
